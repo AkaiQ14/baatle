@@ -39,7 +39,7 @@ let voiceSystem = {
       // Changed: 'joker' to 'Joker'
       'Joker', 'Kaido', 'KaitoKid', 'Kanki', 'Shigaraki', 'Roselle-Gustav',
       'law', 'Lelouch', 'LuffyGear5', 'madara', 'Meruem', 'naruto', 'Neiji', 'NietroCard', 'obito',
-      'QG14', 'queen', 'Sakamoto', 'shikamaru', 'ShanksCard', 'SilverCard', 'smith', 'UmibozoCard',
+      'QG14', 'queen', 'Sakamoto', 'shikamaru', 'ShanksCard', 'Silva Zoldyck', 'smith', 'UmibozoCard',
       // Removed: 'Vegetto', 
       'whitebeard', 'zoro', 'Zenitsu', 'Zeno', 'RockLee', 'AlocardCard', 'alocard', 'alucard', 'AloCard', // إضافة جميع الأسماء المحتملة
       // New voice files added
@@ -124,7 +124,7 @@ let voiceSystem = {
       'Sonji': 'Sonji',
       'shikamaru': 'shikamaru',
       'ShanksCard': 'ShanksCard',
-      'SilverCard': 'SilverCard',
+      'Silva Zoldyck': 'Silva Zoldyck',
       'Shigaraki': 'Shigaraki',
       'smith': 'smith',
       'Todo': 'Todo',
