@@ -314,27 +314,30 @@ async function generateCardSlotsForPlayer() {
   
   console.log('🎴 توليد cardSlots للاعب...');
   
-  // ✅ جلب الكروت المستخدمة للاعب الآخر (إذا كانت موجودة)
+  // ✅ جلب الكروت المستخدمة للاعب الآخر (إذا كانت موجودة) - فقط للعبة الحالية
   let usedCardsByOpponent = [];
   if (gameId) {
     try {
       // تحديد اللاعب الآخر
-      const otherPlayer = player === 1 ? 2 : 1;
+      const otherPlayer = player === "1" ? 2 : 1;
       const otherPlayerParam = otherPlayer === 1 ? 'player1' : 'player2';
       
-      // محاولة جلب cardSlots من Firebase
+      // ✅ التحقق من أن cardSlots للاعب الآخر للعبة الحالية فقط
+      const otherPlayerCardSlotsGameId = localStorage.getItem(`${otherPlayerParam}CardSlots_GameId`);
+      
+      // محاولة جلب cardSlots من Firebase - فقط للعبة الحالية
       const gameData = await GameService.getGame(gameId);
       const otherPlayerData = gameData[`player${otherPlayer}`];
-      if (otherPlayerData && otherPlayerData.cardSlots) {
+      if (otherPlayerData && otherPlayerData.cardSlots && Array.isArray(otherPlayerData.cardSlots)) {
         // استخراج جميع الكروت من cardSlots للاعب الآخر
         otherPlayerData.cardSlots.forEach(slot => {
           if (Array.isArray(slot)) {
             usedCardsByOpponent.push(...slot);
           }
         });
-        console.log(`✅ تم استبعاد ${usedCardsByOpponent.length} كرت مستخدمة للاعب الآخر`);
-      } else {
-        // محاولة من localStorage
+        console.log(`✅ تم استبعاد ${usedCardsByOpponent.length} كرت مستخدمة للاعب الآخر من Firebase`);
+      } else if (otherPlayerCardSlotsGameId === gameId) {
+        // ✅ محاولة من localStorage - فقط إذا كانت للعبة الحالية
         const otherPlayerCardSlots = localStorage.getItem(`${otherPlayerParam}CardSlots`);
         if (otherPlayerCardSlots) {
           try {
@@ -344,11 +347,13 @@ async function generateCardSlotsForPlayer() {
                 usedCardsByOpponent.push(...slot);
               }
             });
-            console.log(`✅ تم استبعاد ${usedCardsByOpponent.length} كرت مستخدمة للاعب الآخر من localStorage`);
+            console.log(`✅ تم استبعاد ${usedCardsByOpponent.length} كرت مستخدمة للاعب الآخر من localStorage للعبة ${gameId}`);
           } catch (e) {
             console.warn('⚠️ خطأ في تحميل cardSlots للاعب الآخر من localStorage');
           }
         }
+      } else {
+        console.log(`ℹ️ تجاهل cardSlots للاعب الآخر - ليست للعبة الحالية (${otherPlayerCardSlotsGameId} != ${gameId})`);
       }
     } catch (e) {
       console.warn('⚠️ لم يتم العثور على كروت للاعب الآخر أو حدث خطأ:', e);
@@ -386,10 +391,13 @@ async function generateCardSlotsForPlayer() {
     return shuffled;
   };
   
-  // ✅ إنشاء بذرة فريدة لكل لعبة ولاعب لضمان العدالة
+  // ✅ إنشاء بذرة فريدة لكل لعبة ولاعب لضمان العدالة والاختلاف التام
+  // ✅ استخدام timestamp إضافي لضمان الاختلاف حتى في نفس gameId
   const gameSeed = gameId ? (gameId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) : Date.now();
   const playerSeed = player === "1" ? 1001 : 2002;
-  const uniqueSeed = gameSeed + playerSeed;
+  // ✅ إضافة timestamp لتوليد بذرة فريدة لكل مرة حتى لو كان gameId نفسه
+  const timestampSeed = Date.now() % 1000000; // آخر 6 أرقام من timestamp
+  const uniqueSeed = gameSeed + playerSeed + timestampSeed;
   
   // ✅ خلط الكروت باستخدام البذرة الفريدة لضمان العدالة
   const shuffledEpic = fairShuffle(availableEpic);
@@ -679,19 +687,49 @@ async function loadGameData() {
     playerName = playerData.name || "اللاعب";
     rounds = gameData.rounds || 11;
     
-    // ✅ تحميل cardSlots من Firebase (البطاقات الصفراء مع 3 كروت لكل بطاقة)
-    cardSlots = playerData.cardSlots || [];
-    
-    // إذا لم توجد cardSlots في Firebase، حاول من localStorage
-    if (!cardSlots || cardSlots.length === 0) {
-      const savedCardSlots = localStorage.getItem(`${playerParam}CardSlots`);
-      if (savedCardSlots) {
-        cardSlots = JSON.parse(savedCardSlots);
-      }
+  // ✅ تحميل cardSlots من Firebase (البطاقات الصفراء مع 3 كروت لكل بطاقة)
+  cardSlots = playerData.cardSlots || [];
+  
+  // ✅ التحقق من أن cardSlots من Firebase للعبة الحالية فقط
+  if (cardSlots && cardSlots.length > 0) {
+    // التحقق من أن cardSlots من Firebase مرتبطة باللعبة الحالية
+    const cardSlotsGameId = localStorage.getItem(`${playerParam}CardSlots_GameId`);
+    if (cardSlotsGameId && cardSlotsGameId !== gameId) {
+      console.log(`🧹 cardSlots من Firebase للعبة مختلفة (${cardSlotsGameId} != ${gameId}) - سيتم توليد جديدة`);
+      cardSlots = [];
+    } else {
+      // حفظ gameId للتحقق في المستقبل
+      localStorage.setItem(`${playerParam}CardSlots_GameId`, gameId);
     }
+  }
+  
+  // ✅ إذا لم توجد cardSlots في Firebase، حاول من localStorage مع التحقق من gameId
+  if (!cardSlots || cardSlots.length === 0) {
+    const savedCardSlots = localStorage.getItem(`${playerParam}CardSlots`);
+    const cardSlotsGameId = localStorage.getItem(`${playerParam}CardSlots_GameId`);
     
-    // ✅ إذا لم توجد cardSlots، قم بتوليدها تلقائياً
-    if (!cardSlots || cardSlots.length === 0) {
+    // ✅ التحقق الشديد: يجب أن تكون cardSlots للعبة الحالية فقط
+    if (savedCardSlots && cardSlotsGameId === gameId) {
+      try {
+        cardSlots = JSON.parse(savedCardSlots);
+        console.log(`✅ تم تحميل cardSlots من localStorage للعبة ${gameId}`);
+      } catch (e) {
+        console.error('❌ خطأ في تحميل cardSlots من localStorage:', e);
+        cardSlots = [];
+      }
+    } else {
+      // ✅ إذا كانت cardSlots من لعبة مختلفة، مسحها وتوليد جديدة
+      if (savedCardSlots && cardSlotsGameId && cardSlotsGameId !== gameId) {
+        console.log(`🧹 مسح cardSlots القديمة من لعبة مختلفة (${cardSlotsGameId} != ${gameId})`);
+        localStorage.removeItem(`${playerParam}CardSlots`);
+        localStorage.removeItem(`${playerParam}CardSlots_GameId`);
+      }
+      cardSlots = [];
+    }
+  }
+  
+  // ✅ إذا لم توجد cardSlots، قم بتوليدها تلقائياً
+  if (!cardSlots || cardSlots.length === 0) {
       console.log('⚠️ cardSlots غير موجودة - سيتم توليدها تلقائياً');
       
       // الانتظار حتى يكون cardManager جاهزاً
@@ -738,9 +776,10 @@ async function loadGameData() {
       }
     }
     
-    // حفظ cardSlots في localStorage والمتغير
+    // ✅ حفظ cardSlots في localStorage والمتغير مع gameId للتأكد من التطابق
     if (cardSlots && cardSlots.length > 0) {
       localStorage.setItem(`${playerParam}CardSlots`, JSON.stringify(cardSlots));
+      localStorage.setItem(`${playerParam}CardSlots_GameId`, gameId); // ✅ حفظ gameId مع cardSlots
       
       // ✅ تحميل الكروت المختارة مسبقاً إذا كانت موجودة - فقط للعبة الحالية
       const savedSelectedCardsKey = `${playerParam}SelectedCards_${gameId}`;
@@ -2850,6 +2889,10 @@ function clearOldGameData() {
     const oldSelectedCardsKey = `${playerParam}SelectedCards`;
     localStorage.removeItem(oldSelectedCardsKey);
     localStorage.removeItem(`${playerParam}SelectedCards_GameId`);
+    
+    // ✅ مسح cardSlots القديمة للاعب الحالي
+    localStorage.removeItem(`${playerParam}CardSlots`);
+    localStorage.removeItem(`${playerParam}CardSlots_GameId`);
     
     // مسح الكروت المختارة لجميع الألعاب (تنظيف شامل)
     Object.keys(localStorage).forEach(key => {
