@@ -195,6 +195,21 @@ export class GameService {
     });
   }
   
+  // ✅ حفظ علامة أن اللاعب أنهى اختيار الكروت (قبل الترتيب)
+  static async savePlayerCardsSelected(gameId, player, cardsSelected) {
+    // Ensure db is initialized
+    if (!db) {
+      const app = getApp();
+      db = getFirestore(app);
+    }
+    
+    const gameRef = doc(db, 'games', gameId);
+    await updateDoc(gameRef, {
+      [`player${player}.cardsSelected`]: cardsSelected,
+      updatedAt: new Date()
+    });
+  }
+  
   // حفظ ترتيب البطاقات
   static async saveCardOrder(gameId, player, cardOrder) {
     // Ensure db is initialized

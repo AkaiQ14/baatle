@@ -2412,7 +2412,7 @@ function openCardSelectionModal(slotIndex, slotCards) {
     };
     
     // حدث النقر
-    cardOption.onclick = () => {
+    cardOption.onclick = async () => {
       // حفظ الاختيار
       selectedCards.push({
         slotIndex: slotIndex,
@@ -2440,6 +2440,21 @@ function openCardSelectionModal(slotIndex, slotCards) {
         // ✅ حفظ حالة isSelectionPhase بعد الانتقال لمرحلة الترتيب
         localStorage.setItem(`${playerParam}IsSelectionPhase_${gameId}`, JSON.stringify(false));
         localStorage.setItem(PICKS_LOCAL_KEY, JSON.stringify(picks));
+        
+        // ✅ حفظ علامة أن اللاعب أنهى اختيار الكروت في Firebase (لإظهار رابط اللاعب الثاني)
+        if (gameId && playerParam === 'player1') {
+          try {
+            // حفظ علامة في Firebase أن اللاعب الأول أنهى اختيار الكروت
+            await GameService.savePlayerCardsSelected(gameId, 1, true);
+            console.log('✅ تم حفظ علامة اكتمال اختيار الكروت للاعب الأول في Firebase');
+          } catch (e) {
+            console.error('❌ خطأ في حفظ علامة اختيار الكروت:', e);
+          }
+          
+          // ✅ حفظ في localStorage كبديل
+          localStorage.setItem(`${gameId}_player1_cardsSelected`, 'true');
+        }
+        
         renderCards(picks);
         if (instruction) {
           instruction.textContent = `اللاعب ${playerName} رتب بطاقاتك`;

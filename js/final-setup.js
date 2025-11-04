@@ -347,17 +347,22 @@ async function checkPlayerStatus() {
     
     const player1Ready = gameData.player1.isReady;
     const player2Ready = gameData.player2.isReady;
+    // ✅ التحقق من أن اللاعب الأول أنهى اختيار الكروت (وليس الترتيب)
+    const player1CardsSelected = gameData.player1.cardsSelected === true;
     
     // Update player 1 status message
     const player1StatusMessage = document.getElementById('player1StatusMessage');
     if (player1StatusMessage) {
       if (player1Ready) {
         player1StatusMessage.classList.add('show');
-        // إظهار رابط اللاعب الثاني بعد اكتمال ترتيب اللاعب الأول
-        showPlayer2Link();
       } else {
         player1StatusMessage.classList.remove('show');
       }
+    }
+    
+    // ✅ إظهار رابط اللاعب الثاني بعد اكتمال اختيار الكروت (وليس الترتيب)
+    if (player1CardsSelected) {
+      showPlayer2Link();
     }
     
     // Update player 2 status message
@@ -399,6 +404,9 @@ function checkPlayerStatusLocalStorage() {
     // Get the current game ID
     const gameId = sessionStorage.getItem('currentGameId') || 'default';
 
+    // ✅ التحقق من أن اللاعب الأول أنهى اختيار الكروت (وليس الترتيب)
+    const player1CardsSelected = localStorage.getItem(`${gameId}_player1_cardsSelected`) === 'true';
+
     // Check for actual submitted orders from player-cards.html
     const player1Order = localStorage.getItem(`${gameId}_player1_order`);
     const player2Order = localStorage.getItem(`${gameId}_player2_order`);
@@ -437,6 +445,11 @@ function checkPlayerStatusLocalStorage() {
       }
     }
     
+    // ✅ إظهار رابط اللاعب الثاني بعد اكتمال اختيار الكروت (وليس الترتيب)
+    if (player1CardsSelected) {
+      showPlayer2Link();
+    }
+    
     // Update player 2 status message
     const player2StatusMessage = document.getElementById('player2StatusMessage');
     if (player2StatusMessage) {
@@ -460,6 +473,7 @@ function checkPlayerStatusLocalStorage() {
     console.log('Player status check (localStorage):', { 
       player1Completed, 
       player2Completed,
+      player1CardsSelected,
       player1Order: !!player1Order,
       player2Order: !!player2Order
     });
@@ -650,17 +664,22 @@ function setupRealTimeListening() {
 function updatePlayerStatus(gameData) {
   const player1Ready = gameData.player1.isReady;
   const player2Ready = gameData.player2.isReady;
+  // ✅ التحقق من أن اللاعب الأول أنهى اختيار الكروت (وليس الترتيب)
+  const player1CardsSelected = gameData.player1.cardsSelected === true;
   
   // Update player 1 status message
   const player1StatusMessage = document.getElementById('player1StatusMessage');
   if (player1StatusMessage) {
     if (player1Ready) {
       player1StatusMessage.classList.add('show');
-      // إظهار رابط اللاعب الثاني بعد اكتمال ترتيب اللاعب الأول
-      showPlayer2Link();
     } else {
       player1StatusMessage.classList.remove('show');
     }
+  }
+  
+  // ✅ إظهار رابط اللاعب الثاني بعد اكتمال اختيار الكروت (وليس الترتيب)
+  if (player1CardsSelected) {
+    showPlayer2Link();
   }
   
   // Update player 2 status message
