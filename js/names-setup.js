@@ -1,7 +1,6 @@
 // Import Firebase GameService
 import { GameService } from './gameService.js';
 
-
 // Game state
 let gameState = {
   player1: { name: '', abilities: [], selectedCards: [] },
@@ -14,6 +13,8 @@ let gameState = {
 
 // Load existing data if available
 document.addEventListener('DOMContentLoaded', function() {
+  console.log('📄 names-setup.js loaded');
+  
   // Ensure tournament state is cleared when entering challenge mode
   try {
     localStorage.removeItem('currentMatchId');
@@ -32,6 +33,22 @@ document.addEventListener('DOMContentLoaded', function() {
   loadExistingData();
   setupEventListeners();
   validateForm();
+  
+  // التحقق من Firebase و GameService
+  console.log('🔍 Checking Firebase:', {
+    auth: typeof window.auth !== 'undefined',
+    db: typeof window.db !== 'undefined',
+    firebaseApp: typeof window.firebaseApp !== 'undefined',
+    GameService: typeof GameService !== 'undefined'
+  });
+  
+  // التحقق من تسجيل الدخول
+  if (window.auth) {
+    const user = window.auth.currentUser;
+    console.log('👤 Current user:', user ? user.uid : 'not logged in');
+  } else {
+    console.warn('⚠️ Firebase auth not loaded yet');
+  }
 });
 
 // Function to clear all previous game data
@@ -115,6 +132,8 @@ function loadExistingData() {
 }
 
 function setupEventListeners() {
+  console.log('🔧 Setting up event listeners...');
+  
   const player1Input = document.getElementById('player1Name');
   const player2Input = document.getElementById('player2Name');
   const roundsSelect = document.getElementById('roundsCount');
@@ -123,6 +142,13 @@ function setupEventListeners() {
   const nextBtn = document.getElementById('nextBtn');
   const leaderboardBtn = document.getElementById('leaderboardBtn');
   const controlPanelBtn = document.getElementById('controlPanelBtn');
+  
+  if (!nextBtn) {
+    console.error('❌ nextBtn not found!');
+    return;
+  }
+  
+  console.log('✅ All elements found');
   
   player1Input.addEventListener('input', validateForm);
   player2Input.addEventListener('input', validateForm);
@@ -184,7 +210,14 @@ function setupEventListeners() {
   
   // Next button click
   if (nextBtn) {
-    nextBtn.addEventListener('click', nextStep);
+    nextBtn.addEventListener('click', function(e) {
+      console.log('🖱️ Next button clicked');
+      e.preventDefault();
+      nextStep();
+    });
+    console.log('✅ Next button event listener added');
+  } else {
+    console.error('❌ Next button not found!');
   }
   
   // Leaderboard button click
@@ -242,9 +275,13 @@ function saveProgress() {
 }
 
 async function nextStep() {
+  console.log('🚀 nextStep() called');
+  
   const player1Name = document.getElementById('player1Name').value.trim();
   const player2Name = document.getElementById('player2Name').value.trim();
   const rounds = parseInt(document.getElementById('roundsCount').value);
+  
+  console.log('📝 Player names:', { player1Name, player2Name, rounds });
   
   // التحقق من صحة البيانات
   if (player1Name.length < 2 || player2Name.length < 2) {
@@ -263,6 +300,59 @@ async function nextStep() {
     nextBtn.disabled = true;
     nextBtn.textContent = 'جاري إنشاء اللعبة...';
     
+    // ✅ التحقق من تحميل GameService
+    if (typeof GameService === 'undefined' || !GameService) {
+      console.error('❌ GameService not loaded');
+      // محاولة إعادة التحميل
+      try {
+        const gameServiceModule = await import('./gameService.js');
+        if (gameServiceModule && gameServiceModule.GameService) {
+          window.GameService = gameServiceModule.GameService;
+          GameService = gameServiceModule.GameService;
+          console.log('✅ GameService reloaded successfully');
+        } else {
+          throw new Error('GameService غير محمل. يرجى تحديث الصفحة.');
+        }
+      } catch (importError) {
+        console.error('❌ Error reloading GameService:', importError);
+        throw new Error('فشل تحميل GameService: ' + importError.message);
+      }
+    }
+    console.log('✅ GameService loaded');
+    
+    // ✅ التحقق من Firebase
+    if (typeof window.auth === 'undefined' || !window.auth) {
+      throw new Error('Firebase غير مهيأ. يرجى تحديث الصفحة.');
+    }
+    console.log('✅ Firebase auth loaded');
+    
+    // ✅ التحقق من تسجيل الدخول
+    let user = window.auth ? window.auth.currentUser : null;
+    if (!user) {
+      console.warn('⚠️ User not logged in, attempting to sign in anonymously...');
+      try {
+        // محاولة تسجيل الدخول كضيف
+        const { AuthService } = await import('./auth-service.js');
+        await AuthService.signInAnonymously();
+        // انتظار قصير لتحديث حالة المستخدم
+        await new Promise(resolve => setTimeout(resolve, 500));
+        user = window.auth ? window.auth.currentUser : null;
+        
+        if (!user) {
+          throw new Error('فشل تسجيل الدخول التلقائي');
+        }
+        console.log('✅ User logged in successfully:', user.uid);
+      } catch (authError) {
+        console.error('❌ Error signing in:', authError);
+        alert('فشل تسجيل الدخول. يرجى تحديث الصفحة والمحاولة مرة أخرى.');
+        nextBtn.disabled = false;
+        nextBtn.textContent = 'متابعة';
+        return;
+      }
+    } else {
+      console.log('✅ User logged in:', user.uid);
+    }
+    
     // ✅ التأكد من تحديث advancedMode قبل إنشاء اللعبة
     const checkbox = document.getElementById('checkbox');
     gameState.advancedMode = checkbox.classList.contains('checked');
@@ -271,8 +361,13 @@ async function nextStep() {
     // حفظ البيانات المحلية أولاً لضمان التزامن
     saveProgress();
     
+    console.log('🔄 Creating game in Firebase...');
     // إنشاء لعبة في Firebase
     const gameId = await GameService.createGame(player1Name, player2Name, rounds, gameState.advancedMode);
+    
+    if (!gameId) {
+      throw new Error('فشل إنشاء اللعبة - لم يتم إرجاع معرف اللعبة');
+    }
     
     // ✅ حفظ معرف اللعبة في localStorage و sessionStorage
     localStorage.setItem('currentGameId', gameId);
@@ -290,11 +385,13 @@ async function nextStep() {
     console.log('✅ تم حفظ gameSetupProgress مع advancedMode:', currentSetup.advancedMode);
     
     // الانتقال للصفحة التالية
+    console.log('🔄 Redirecting to abilities-setup.html...');
     window.location.href = 'abilities-setup.html';
     
   } catch (error) {
-    console.error('Error creating game:', error);
-    alert('حدث خطأ في إنشاء اللعبة: ' + error.message);
+    console.error('❌ Error creating game:', error);
+    console.error('Error stack:', error.stack);
+    alert('حدث خطأ في إنشاء اللعبة: ' + (error.message || error));
     
     // إعادة تفعيل الزر
     const nextBtn = document.getElementById('nextBtn');
@@ -316,7 +413,7 @@ function showLeaderboard() {
     left: 0;
     right: 0;
     bottom: 0;
-    background: url('images/QG14Background.png') center/cover no-repeat, #8B1538;
+    background: url('./images/QG14Background.png') center/cover no-repeat, #8B1538;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1069,7 +1166,7 @@ function showControlPanel() {
     left: 0;
     right: 0;
     bottom: 0;
-    background: url('images/QG14Background.png') center/cover no-repeat, #8B1538;
+    background: url('./images/QG14Background.png') center/cover no-repeat, #8B1538;
     display: flex;
     align-items: center;
     justify-content: center;

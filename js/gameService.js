@@ -69,18 +69,44 @@ setTimeout(() => {
 export class GameService {
   // إنشاء لعبة جديدة
   static async createGame(player1Name, player2Name, rounds, advancedMode = false) {
+    console.log('🎮 GameService.createGame called with:', { player1Name, player2Name, rounds, advancedMode });
+    
     // Ensure auth and db are initialized
     if (!auth || !db) {
-      const app = getApp();
-      auth = getAuth(app);
-      db = getFirestore(app);
+      console.log('⚠️ auth or db not initialized, trying to initialize...');
+      try {
+        const app = getAppInstance();
+        if (app) {
+          auth = getAuth(app);
+          db = getFirestore(app);
+          console.log('✅ Firebase initialized in createGame');
+        } else {
+          // Fallback: get from window
+          if (window.auth && window.db) {
+            auth = window.auth;
+            db = window.db;
+            console.log('✅ Firebase initialized from window objects');
+          } else {
+            throw new Error('Firebase not initialized');
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error initializing Firebase:', error);
+        throw new Error('فشل تهيئة Firebase: ' + error.message);
+      }
+    }
+    
+    if (!auth || !db) {
+      throw new Error('Firebase غير مهيأ بشكل صحيح');
     }
     
     const user = auth.currentUser;
     if (!user) {
-      alert("الرجاء تسجيل الدخول أولاً");
-      return;
+      console.error('❌ User not logged in');
+      throw new Error('الرجاء تسجيل الدخول أولاً');
     }
+    
+    console.log('✅ User authenticated:', user.uid);
 
     const gameData = {
       player1: {
