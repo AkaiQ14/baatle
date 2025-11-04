@@ -306,6 +306,106 @@ function createMedia(url, className, onClick) {
 
 /* ================== Generate Card Slots ================== */
 // ✅ دالة لتوليد cardSlots (20 بطاقة صفراء مع 3 كروت لكل بطاقة)
+// ✅ دالة لاستخراج جميع الكروت من cardSlots وتطبيعها للمقارنة
+function getAllCardsFromSlots(cardSlots) {
+  if (!cardSlots || !Array.isArray(cardSlots)) {
+    return [];
+  }
+  
+  const allCards = [];
+  cardSlots.forEach(slot => {
+    if (Array.isArray(slot)) {
+      slot.forEach(card => {
+        // تطبيع مسار الكرت للمقارنة الصحيحة
+        if (card && typeof card === 'string') {
+          const normalizedCard = card.trim().replace(/\/+/g, '/').replace(/\/$/, '');
+          if (normalizedCard && !allCards.includes(normalizedCard)) {
+            allCards.push(normalizedCard);
+          }
+        }
+      });
+    }
+  });
+  
+  return allCards;
+}
+
+// ✅ دالة لتطبيع مسار الكرت للمقارنة
+function normalizeCardPath(card) {
+  if (!card || typeof card !== 'string') {
+    return null;
+  }
+  // تطبيع المسار: إزالة المسافات الزائدة، توحيد الفواصل، إزالة الفواصل النهائية
+  return card.trim().replace(/\/+/g, '/').replace(/\/$/, '').toLowerCase();
+}
+
+// ✅ دالة للتحقق من عدم وجود تكرار بين اللاعبين
+async function validateNoDuplicatesBetweenPlayers(playerCardSlots, gameId) {
+  if (!gameId || !playerCardSlots || !Array.isArray(playerCardSlots)) {
+    return { isValid: true, duplicates: [] };
+  }
+  
+  try {
+    // جلب بيانات اللعبة من Firebase
+    const gameData = await GameService.getGame(gameId);
+    
+    // تحديد اللاعب الآخر
+    const otherPlayer = player === "1" ? 2 : 1;
+    const otherPlayerData = gameData[`player${otherPlayer}`];
+    
+    // استخراج جميع الكروت من cardSlots للاعب الحالي
+    const currentPlayerCards = getAllCardsFromSlots(playerCardSlots);
+    
+    // استخراج جميع الكروت من cardSlots للاعب الآخر
+    let opponentCards = [];
+    if (otherPlayerData && otherPlayerData.cardSlots && Array.isArray(otherPlayerData.cardSlots)) {
+      opponentCards = getAllCardsFromSlots(otherPlayerData.cardSlots);
+    } else {
+      // محاولة من localStorage إذا لم تكن في Firebase
+      const otherPlayerParam = otherPlayer === 1 ? 'player1' : 'player2';
+      const otherPlayerCardSlotsGameId = localStorage.getItem(`${otherPlayerParam}CardSlots_GameId`);
+      if (otherPlayerCardSlotsGameId === gameId) {
+        const savedCardSlots = localStorage.getItem(`${otherPlayerParam}CardSlots`);
+        if (savedCardSlots) {
+          try {
+            const parsed = JSON.parse(savedCardSlots);
+            opponentCards = getAllCardsFromSlots(parsed);
+          } catch (e) {
+            console.warn('⚠️ خطأ في تحميل cardSlots للاعب الآخر من localStorage للتحقق');
+          }
+        }
+      }
+    }
+    
+    // التحقق من التكرار باستخدام مقارنة تطبيعية
+    const duplicates = [];
+    const normalizedCurrentPlayerCards = currentPlayerCards.map(c => normalizeCardPath(c));
+    const normalizedOpponentCards = opponentCards.map(c => normalizeCardPath(c));
+    
+    normalizedCurrentPlayerCards.forEach((normalizedCard, index) => {
+      if (normalizedCard && normalizedOpponentCards.includes(normalizedCard)) {
+        const originalCard = currentPlayerCards[index];
+        if (!duplicates.includes(originalCard)) {
+          duplicates.push(originalCard);
+        }
+      }
+    });
+    
+    if (duplicates.length > 0) {
+      console.error(`❌ تم العثور على ${duplicates.length} كرت مكررة بين اللاعبين:`, duplicates);
+      return { isValid: false, duplicates };
+    }
+    
+    console.log('✅ التحقق: لا توجد كروت مكررة بين اللاعبين');
+    return { isValid: true, duplicates: [] };
+    
+  } catch (error) {
+    console.warn('⚠️ خطأ في التحقق من التكرار:', error);
+    // في حالة الخطأ، نعتبر أن التحقق ناجح (لعدم منع الحفظ)
+    return { isValid: true, duplicates: [] };
+  }
+}
+
 async function generateCardSlotsForPlayer() {
   if (!window.cardManager) {
     console.error('cardManager غير متوفر');
@@ -329,12 +429,9 @@ async function generateCardSlotsForPlayer() {
       const gameData = await GameService.getGame(gameId);
       const otherPlayerData = gameData[`player${otherPlayer}`];
       if (otherPlayerData && otherPlayerData.cardSlots && Array.isArray(otherPlayerData.cardSlots)) {
-        // استخراج جميع الكروت من cardSlots للاعب الآخر
-        otherPlayerData.cardSlots.forEach(slot => {
-          if (Array.isArray(slot)) {
-            usedCardsByOpponent.push(...slot);
-          }
-        });
+        // استخراج جميع الكروت من cardSlots للاعب الآخر باستخدام دالة الاستخراج
+        const opponentCards = getAllCardsFromSlots(otherPlayerData.cardSlots);
+        usedCardsByOpponent = opponentCards;
         console.log(`✅ تم استبعاد ${usedCardsByOpponent.length} كرت مستخدمة للاعب الآخر من Firebase`);
       } else if (otherPlayerCardSlotsGameId === gameId) {
         // ✅ محاولة من localStorage - فقط إذا كانت للعبة الحالية
@@ -342,11 +439,8 @@ async function generateCardSlotsForPlayer() {
         if (otherPlayerCardSlots) {
           try {
             const parsed = JSON.parse(otherPlayerCardSlots);
-            parsed.forEach(slot => {
-              if (Array.isArray(slot)) {
-                usedCardsByOpponent.push(...slot);
-              }
-            });
+            const opponentCards = getAllCardsFromSlots(parsed);
+            usedCardsByOpponent = opponentCards;
             console.log(`✅ تم استبعاد ${usedCardsByOpponent.length} كرت مستخدمة للاعب الآخر من localStorage للعبة ${gameId}`);
           } catch (e) {
             console.warn('⚠️ خطأ في تحميل cardSlots للاعب الآخر من localStorage');
@@ -364,9 +458,16 @@ async function generateCardSlotsForPlayer() {
   const commonCards = window.cardManager.getAllCardsByCategory('common') || [];
   const epicCards = window.cardManager.getAllCardsByCategory('epic') || [];
   
-  // ✅ استبعاد الكروت المستخدمة للاعب الآخر
-  const availableCommon = commonCards.filter(card => !usedCardsByOpponent.includes(card));
-  const availableEpic = epicCards.filter(card => !usedCardsByOpponent.includes(card));
+  // ✅ استبعاد الكروت المستخدمة للاعب الآخر باستخدام مقارنة تطبيعية
+  const normalizedUsedCards = usedCardsByOpponent.map(card => normalizeCardPath(card));
+  const availableCommon = commonCards.filter(card => {
+    const normalizedCard = normalizeCardPath(card);
+    return !normalizedUsedCards.includes(normalizedCard);
+  });
+  const availableEpic = epicCards.filter(card => {
+    const normalizedCard = normalizeCardPath(card);
+    return !normalizedUsedCards.includes(normalizedCard);
+  });
   
   console.log(`📊 الكروت المتاحة: ${availableCommon.length} common, ${availableEpic.length} epic`);
   console.log(`📊 الكروت المستبعدة: ${usedCardsByOpponent.length} كرت`);
@@ -755,15 +856,61 @@ async function loadGameData() {
       const cardManagerReady = await waitForCardManager();
       
       if (cardManagerReady) {
-        cardSlots = await generateCardSlotsForPlayer();
+        // ✅ توليد cardSlots مع التحقق من عدم وجود تكرار
+        let maxAttempts = 5;
+        let attempts = 0;
+        let validationResult = { isValid: false, duplicates: [] };
         
-        // حفظ cardSlots في Firebase
-        if (cardSlots && cardSlots.length > 0 && gameId) {
-          try {
-            await GameService.savePlayerCardSlots(gameId, player, cardSlots);
-            console.log('✅ تم حفظ cardSlots في Firebase');
-          } catch (e) {
-            console.error('❌ فشل حفظ cardSlots في Firebase:', e);
+        do {
+          cardSlots = await generateCardSlotsForPlayer();
+          
+          if (cardSlots && cardSlots.length > 0 && gameId) {
+            // ✅ التحقق من عدم وجود تكرار قبل الحفظ
+            validationResult = await validateNoDuplicatesBetweenPlayers(cardSlots, gameId);
+            
+            if (validationResult.isValid) {
+              // ✅ لا توجد تكرارات - حفظ في Firebase
+              try {
+                await GameService.savePlayerCardSlots(gameId, player, cardSlots);
+                console.log('✅ تم حفظ cardSlots في Firebase بدون تكرار');
+                break; // نجح الحفظ - خروج من الحلقة
+              } catch (e) {
+                console.error('❌ فشل حفظ cardSlots في Firebase:', e);
+                // في حالة فشل الحفظ، نعيد المحاولة
+                attempts++;
+                if (attempts >= maxAttempts) {
+                  console.error('❌ فشل حفظ cardSlots بعد عدة محاولات');
+                  break;
+                }
+                // انتظار قصير قبل إعادة المحاولة
+                await new Promise(resolve => setTimeout(resolve, 500));
+              }
+            } else {
+              // ✅ تم العثور على تكرارات - إعادة توليد الكروت
+              console.warn(`⚠️ تم العثور على ${validationResult.duplicates.length} كرت مكررة - إعادة توليد الكروت... (المحاولة ${attempts + 1}/${maxAttempts})`);
+              attempts++;
+              
+              // انتظار قصير قبل إعادة المحاولة
+              if (attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 300));
+              }
+            }
+          } else {
+            console.error('❌ فشل توليد cardSlots');
+            break;
+          }
+        } while (!validationResult.isValid && attempts < maxAttempts);
+        
+        // ✅ إذا فشلت جميع المحاولات، نستخدم الكروت المولدة مع تحذير
+        if (!validationResult.isValid && attempts >= maxAttempts) {
+          console.error(`❌ فشل توليد كروت بدون تكرار بعد ${maxAttempts} محاولات - سيتم حفظ الكروت الحالية مع تحذير`);
+          if (cardSlots && cardSlots.length > 0 && gameId) {
+            try {
+              await GameService.savePlayerCardSlots(gameId, player, cardSlots);
+              console.log('⚠️ تم حفظ cardSlots مع تحذير بوجود تكرارات محتملة');
+            } catch (e) {
+              console.error('❌ فشل حفظ cardSlots في Firebase:', e);
+            }
           }
         }
       } else {
