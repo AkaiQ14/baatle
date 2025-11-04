@@ -124,6 +124,13 @@ const STRATEGIC_GAME_ID_KEY = `${playerParam}_StrategicGameId`;
 const LAST_LOAD_TIME_KEY = `${playerParam}_LastLoadTime`;
 const LAST_SUBMIT_TIME_KEY = `${playerParam}_LastSubmitTime`;
 
+// ✅ حماية قوية من التكرار - علامات تتبع حالة التحميل
+let isLoadingPlayerCards = false;
+let isCardsRendered = false;
+let lastLoadPlayerParam = null;
+let lastLoadGameId = null;
+let isLoadingGameData = false;
+
 const instruction = document.getElementById("instruction");
 const grid = document.getElementById("cardGrid");
 const continueBtn = document.getElementById("continueBtn");
@@ -596,11 +603,20 @@ async function generateCardSlotsForPlayer() {
 
 /* ================== Load Game Data from Firebase ================== */
 async function loadGameData() {
+  // ✅ حماية قوية من التكرار - التحقق من حالة التحميل
+  if (isLoadingGameData) {
+    console.log(`⚠️ تجاهل تحميل gameData متكرر للاعب ${playerParam} - التحميل قيد التنفيذ`);
+    return;
+  }
+  
   if (!gameId) {
     console.error('No game ID found');
     alert('لم يتم العثور على معرف اللعبة');
     return;
   }
+  
+  // ✅ تعيين علامة التحميل قبل البدء
+  isLoadingGameData = true;
   
   try {
     // إظهار loading
@@ -889,6 +905,11 @@ async function loadGameData() {
       continueBtn.disabled = false;
       continueBtn.textContent = 'متابعة';
     }
+  } finally {
+    // ✅ إعادة تعيين علامة التحميل بعد الانتهاء (حتى في حالة الخطأ)
+    setTimeout(() => {
+      isLoadingGameData = false;
+    }, 500);
   }
 }
 
@@ -987,20 +1008,37 @@ function renderAbilities(abilities) {
 }
 
 /* ================== Initialize Card Manager ================== */
+// ✅ حماية من التكرار في initializeCardManager
+let isInitializingCardManager = false;
 function initializeCardManager() {
+  // ✅ حماية: منع التهيئة المكررة
+  if (isInitializingCardManager) {
+    console.log('⚠️ تهيئة cardManager قيد التنفيذ - تجاهل التهيئة المكررة');
+    return;
+  }
+  
   // Wait for card manager to be available
   if (typeof window.cardManager !== 'undefined') {
     cardManager = window.cardManager;
+    isInitializingCardManager = true;
     
     // ✅ نظام موحد: استخدم loadGameData للبطولة والتحدي
     if (gameId) {
       console.log(`🔄 Loading game data from Firebase for ${playerParam} (gameId: ${gameId})`);
-      loadGameData(); // تحميل من Firebase دائماً
+      if (!isLoadingPlayerCards) {
+        loadGameData(); // تحميل من Firebase دائماً
+      }
     } else {
       console.warn(`⚠️ No gameId found for ${playerParam}`);
       // fallback to localStorage
-      loadPlayerCards();
+      if (!isLoadingPlayerCards) {
+        loadPlayerCards();
+      }
     }
+    // إعادة تعيين العلامة بعد قليل
+    setTimeout(() => {
+      isInitializingCardManager = false;
+    }, 1000);
   } else {
     // Wait a bit and try again
     setTimeout(initializeCardManager, 100);
@@ -1008,6 +1046,12 @@ function initializeCardManager() {
 }
 
 function loadPlayerCards() {
+  // ✅ حماية قوية من التكرار - التحقق من حالة التحميل
+  if (isLoadingPlayerCards) {
+    console.log(`⚠️ تجاهل تحميل متكرر للاعب ${playerParam} - التحميل قيد التنفيذ`);
+    return;
+  }
+
   if (!cardManager) {
     console.error('Card manager not available');
     return;
@@ -1019,16 +1063,27 @@ function loadPlayerCards() {
     return;
   }
 
-  console.log(`🔄 تحميل بطاقات اللاعب ${playerParam} للعبة ${gameId}`);
-
-  // حماية إضافية: تحقق من أن هذا اللاعب لم يتم تحميله بالفعل
+  // ✅ حماية إضافية: التحقق من أن هذا اللاعب واللعبة لم يتم تحميلهما بالفعل
   const lastLoadTime = localStorage.getItem(LAST_LOAD_TIME_KEY);
   const currentTime = Date.now();
-  if (lastLoadTime && (currentTime - parseInt(lastLoadTime)) < 1000) {
-    console.log(`⚠️ تجاهل تحميل متكرر للاعب ${playerParam} - تم التحميل مؤخراً`);
+  const timeSinceLastLoad = lastLoadTime ? (currentTime - parseInt(lastLoadTime)) : Infinity;
+  
+  // ✅ تحقق شامل: نفس اللاعب + نفس اللعبة + وقت قصير جداً = تكرار
+  if (lastLoadPlayerParam === playerParam && 
+      lastLoadGameId === gameId && 
+      timeSinceLastLoad < 2000 && 
+      isCardsRendered) {
+    console.log(`⚠️ تجاهل تحميل متكرر للاعب ${playerParam} - تم التحميل مؤخراً (${Math.round(timeSinceLastLoad)}ms)`);
     return;
   }
+
+  // ✅ تعيين علامة التحميل قبل البدء
+  isLoadingPlayerCards = true;
+  lastLoadPlayerParam = playerParam;
+  lastLoadGameId = gameId;
   localStorage.setItem(LAST_LOAD_TIME_KEY, currentTime.toString());
+
+  console.log(`🔄 تحميل بطاقات اللاعب ${playerParam} للعبة ${gameId}`);
 
   // ✅ التحقق من gameId قبل تحميل البطاقات من localStorage
   const currentGameId = localStorage.getItem(CURRENT_GAME_ID_KEY);
@@ -1173,6 +1228,12 @@ function loadPlayerCards() {
   
   // Load player abilities
   loadPlayerAbilities();
+  
+  // ✅ إعادة تعيين علامات التحميل بعد الانتهاء
+  setTimeout(() => {
+    isLoadingPlayerCards = false;
+    isCardsRendered = true;
+  }, 500);
 }
 
 /* ================== Abilities (self) ================== */
@@ -1678,8 +1739,17 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-// Simple storage change listener like order.js
+// Simple storage change listener like order.js - مع حماية قوية من التكرار
 window.addEventListener('storage', function(e) {
+  // ✅ حماية: تجاهل التغييرات للاعب الآخر
+  if (e.key && e.key.includes('player') && !e.key.includes(playerParam)) {
+    const otherPlayerParam = playerParam === 'player1' ? 'player2' : 'player1';
+    if (e.key.includes(otherPlayerParam) && !e.key.includes(playerParam)) {
+      console.log(`🚫 تجاهل تغيير storage للاعب الآخر في abilities: ${e.key}`);
+      return;
+    }
+  }
+  
   // ✅ استماع لإشارة التحديث الصريحة (أسرع طريقة)
   if (e.key === 'abilitiesLastUpdate') {
     console.log('⚡ Immediate abilities update signal received!');
@@ -1689,7 +1759,14 @@ window.addEventListener('storage', function(e) {
     return; // تم المعالجة، لا حاجة للمتابعة
   }
   
+  // ✅ حماية: التحقق من أن التغيير للاعب الحالي فقط
   if (e.key && e.key.includes('Abilities')) {
+    // تحقق من أن المفتاح للاعب الحالي
+    const keyPlayerParam = e.key.includes('player1') ? 'player1' : (e.key.includes('player2') ? 'player2' : null);
+    if (keyPlayerParam && keyPlayerParam !== playerParam && !e.key.includes('Opponent')) {
+      console.log(`🚫 تجاهل تغيير Abilities للاعب الآخر: ${keyPlayerParam} (ليس ${playerParam})`);
+      return;
+    }
     console.log(`Storage change detected: ${e.key}`);
     loadPlayerAbilities();
     loadOpponentAbilities();
@@ -2673,8 +2750,12 @@ window.arrangeCards = function(playerParam, gameId, playerName) {
       instruction.textContent = `اللاعب ${playerName} رتب بطاقاتك`;
     }
     
-    // Reload cards with new parameters
-    loadPlayerCards();
+    // ✅ إعادة تحميل البطاقات مع حماية من التكرار
+    if (!isLoadingPlayerCards) {
+      loadPlayerCards();
+    } else {
+      console.log("⚠️ تجاهل إعادة تحميل البطاقات - التحميل قيد التنفيذ");
+    }
   }
 };
 
@@ -2818,8 +2899,16 @@ document.addEventListener('visibilitychange', function() {
   }
 });
 
-// Initialize card manager when page loads
+// Initialize card manager when page loads - مع حماية من التكرار
+let isInitialized = false;
 document.addEventListener('DOMContentLoaded', function() {
+  // ✅ حماية: منع التهيئة المكررة
+  if (isInitialized) {
+    console.log("⚠️ تم التهيئة بالفعل - تجاهل التهيئة المكررة");
+    return;
+  }
+  isInitialized = true;
+  
   // Show home button in tournament mode
   const isTournament = localStorage.getItem('currentMatchId') !== null;
   const homeBtn = document.getElementById('homeBtn');
@@ -2832,13 +2921,23 @@ document.addEventListener('DOMContentLoaded', function() {
   // Check for ability requests every 1 second for faster response
   setInterval(checkAbilityRequests, 1000);
   
-  // Listen for storage changes
+  // Listen for storage changes - مع حماية من التكرار
   window.addEventListener('storage', function(e) {
+    // ✅ حماية: تجاهل التغييرات للاعب الآخر
+    if (e.key && e.key.includes('player') && !e.key.includes(playerParam)) {
+      const otherPlayerParam = playerParam === 'player1' ? 'player2' : 'player1';
+      if (e.key.includes(otherPlayerParam)) {
+        console.log(`🚫 تجاهل تغيير storage للاعب الآخر: ${e.key}`);
+        return;
+      }
+    }
+    
     if (e.key === 'abilityRequests') {
       checkAbilityRequests();
     } else if (e.key && e.key.endsWith('UsedAbilities')) {
       // Handle ability usage changes from host
       const playerParamFromKey = e.key.replace('UsedAbilities', '');
+      // ✅ حماية قوية: التحقق من أن التغيير للاعب الحالي فقط
       if (playerParamFromKey === playerParam) {
         console.log(`Received ability usage change via storage: ${e.key}`);
         
@@ -2847,6 +2946,8 @@ document.addEventListener('DOMContentLoaded', function() {
           console.log('Reloading abilities due to host changes...');
           loadPlayerAbilities();
         }, 100);
+      } else {
+        console.log(`🚫 تجاهل تغيير UsedAbilities للاعب الآخر: ${playerParamFromKey} (ليس ${playerParam})`);
       }
     }
   });
@@ -3003,15 +3104,29 @@ window.addEventListener('storage', function(e) {
     if (e.key === ORDER_LOCAL_KEY || e.key === PICKS_LOCAL_KEY) {
       console.log(`🔄 فوراً: تغيير في ${e.key} للاعب الحالي ${playerParam}, إعادة تحميل البطاقات`);
       
-      // تحقق إضافي للتأكد من أن التغيير خاص باللاعب الحالي
+      // ✅ تحقق شامل: التأكد من أن التغيير خاص باللاعب الحالي واللعبة الحالية
       const currentGameId = localStorage.getItem(CURRENT_GAME_ID_KEY);
-      if (currentGameId && gameId && currentGameId === gameId) {
+      const keyPlayerParam = e.key.includes('player1') ? 'player1' : (e.key.includes('player2') ? 'player2' : null);
+      
+      // ✅ حماية قوية: تجاهل إذا لم يكن للاعب الحالي أو اللعبة الحالية
+      if (keyPlayerParam && keyPlayerParam !== playerParam) {
+        console.log(`🚫 تجاهل التغيير في ${e.key} - للاعب الآخر ${keyPlayerParam} (ليس ${playerParam})`);
+        return;
+      }
+      
+      if (currentGameId && gameId && currentGameId === gameId && !isLoadingPlayerCards) {
         // تأخير صغير لتجنب التداخل
         setTimeout(() => {
-          loadPlayerCards();
-        }, 100);
+          if (!isLoadingPlayerCards) {
+            loadPlayerCards();
+          }
+        }, 200);
       } else {
-        console.log(`⚠️ تجاهل التغيير في ${e.key} - ليس للعبة الحالية`);
+        if (isLoadingPlayerCards) {
+          console.log(`⚠️ تجاهل التغيير في ${e.key} - التحميل قيد التنفيذ`);
+        } else {
+          console.log(`⚠️ تجاهل التغيير في ${e.key} - ليس للعبة الحالية`);
+        }
       }
     }
     
@@ -3038,12 +3153,26 @@ window.addEventListener('storage', function(e) {
 // ✅ استقبال رسائل مباشرة للترتيب (لو المضيف أرسلها)
 window.addEventListener('message', function(e) {
   if (e.data && e.data.type === 'ORDER_UPDATED') {
-    console.log("🔄 استلام ترتيب جديد عبر postMessage:", e.data);
-    loadPlayerCards();
+    // ✅ حماية: التحقق من أن الرسالة للاعب الحالي
+    if (e.data.playerParam && e.data.playerParam !== playerParam) {
+      console.log(`🚫 تجاهل ORDER_UPDATED - للاعب الآخر ${e.data.playerParam}`);
+      return;
+    }
+    if (!isLoadingPlayerCards) {
+      console.log("🔄 استلام ترتيب جديد عبر postMessage:", e.data);
+      loadPlayerCards();
+    }
   }
   if (e.data && e.data.type === 'PICKS_UPDATED') {
-    console.log("🔄 استلام اختيارات جديدة عبر postMessage:", e.data);
-    loadPlayerCards();
+    // ✅ حماية: التحقق من أن الرسالة للاعب الحالي
+    if (e.data.playerParam && e.data.playerParam !== playerParam) {
+      console.log(`🚫 تجاهل PICKS_UPDATED - للاعب الآخر ${e.data.playerParam}`);
+      return;
+    }
+    if (!isLoadingPlayerCards) {
+      console.log("🔄 استلام اختيارات جديدة عبر postMessage:", e.data);
+      loadPlayerCards();
+    }
   }
 });
 
@@ -3642,25 +3771,38 @@ window.submitTournamentPicks = submitTournamentPicks;
 
 
 
-// ✅ إعادة تحميل ترتيب الكروت بعد تحديث الصفحة
+// ✅ إعادة تحميل ترتيب الكروت بعد تحديث الصفحة - مع حماية قوية
+let hasInitialLoadCompleted = false;
 document.addEventListener("DOMContentLoaded", () => {
   try {
+    // ✅ حماية: منع التحميل المكرر إذا تم التحميل بالفعل
+    if (hasInitialLoadCompleted) {
+      console.log("⚠️ تم التحميل الأولي بالفعل - تجاهل التحميل المكرر");
+      return;
+    }
+    
     // نمنع التحميل المكرر إذا كانت الدالة تعمل بالفعل
-    if (typeof loadPlayerCards === "function") {
+    if (typeof loadPlayerCards === "function" && !isLoadingPlayerCards) {
       console.log("🔁 إعادة تحميل ترتيب الكروت من localStorage بعد التحديث...");
       loadPlayerCards();
+      hasInitialLoadCompleted = true;
 
       // في حال لم يكن cardManager جاهزاً بعد، نعيد المحاولة بعد قليل
       setTimeout(() => {
-        if (typeof window.cardManager === "undefined") {
+        if (typeof window.cardManager === "undefined" && !isLoadingPlayerCards) {
           console.warn("⚠️ cardManager لم يجهز بعد — إعادة المحاولة...");
           loadPlayerCards();
         }
       }, 1000);
     } else {
-      console.warn("⚠️ الدالة loadPlayerCards غير متوفرة حالياً.");
+      if (isLoadingPlayerCards) {
+        console.log("⚠️ التحميل قيد التنفيذ - تجاهل التحميل المكرر");
+      } else {
+        console.warn("⚠️ الدالة loadPlayerCards غير متوفرة حالياً.");
+      }
     }
   } catch (e) {
     console.error("❌ خطأ أثناء إعادة تحميل ترتيب الكروت:", e);
+    hasInitialLoadCompleted = false; // إعادة تعيين في حالة الخطأ
   }
 });
