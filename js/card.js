@@ -32,7 +32,7 @@ let voiceSystem = {
     const legendaryPatterns = [
       'aizen', 'AizenVoCrowCard', 'Akai', 'AllForOne', 'Ayanokoji', 'Ranppo', 'Todo',
       // Removed: 'Asta', 
-      'Beru', 'Cell', 'Sasuke', 'Vermoth', 'Ouki', 'Kakashi', 'Rukia', 'Akame',
+      'Beru', 'Cell', 'Sasuke', 'Vermoth', 'Ouki', 'Kakashi', 'Rukia', 'Akame', 'Sukuna',
       'Dio', 'ErenCard', 'foboki', 'Gin', 'Giyuu', 'Gogeta', 'Gohan Beast', 'Gojo', 
       // Removed: 'Goku UI', 
       'Hashirama', 'Hawks', 'Hinata', 'Hisoka', 'jiraya', 'Riboku', 'Lelouch', 'Utsuro', 'Kyurak', 'Shinobu',
@@ -143,6 +143,7 @@ let voiceSystem = {
       'rocklee': 'RockLee',
       'Roger': 'Roger',
       'Shinobu': 'Shinobu',
+      'Sukuna': 'Sukuna',
       // AlocardCard support
       'AlocardCard': 'AlocardCard',
       'alocardcard': 'AlocardCard',
