@@ -1,0 +1,6 @@
+# Netlify redirects for SPA
+/*    /index.html   200
+
+# Handle card images - all cards are in 'cards' directory
+/cards/*     /cards/:splat      200
+/images/*    /images/:splat     200

@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>إعداد القدرات - تحدي بطاقات الأنمي</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg: #8B1538;
+      --panel: #2d2d2d;
+      --panel-light: #3a3a3a;
+      --accent: #dc2626;
+      --accent-light: #ef4444;
+      --accent-dark: #b91c1c;
+      --text: #ffffff;
+      --text-muted: #cccccc;
+      --btn: #dc2626;
+      --btn-hover: #ef4444;
+      --shadow: 0 8px 32px rgba(0,0,0,0.3);
+      --shadow-light: 0 4px 16px rgba(0,0,0,0.2);
+      --radius: 12px;
+      --radius-large: 16px;
+      --error: #f44336;
+      --success: #4caf50;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    html {
+      overflow: hidden;
+      height: 100%;
+    }
+    
+    body {
+      font-family: "Cairo", sans-serif;
+      background: #8B1538;
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 15px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      box-sizing: border-box;
+      transform: scale(1.30);
+      overflow: hidden;
+    }
+    
+    .video-background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      object-fit: cover;
+    }
+    
+    
+    .container {
+      background: rgba(45, 45, 45, 0.545);
+      border: 2px solid rgba(220, 38, 38, 0.3);
+      border-radius: var(--radius-large);
+      padding: 50px 40px;
+      backdrop-filter: blur(20px);
+      box-shadow: var(--shadow);
+      width: 100%;
+      max-width: 950px; 
+      text-align: center;
+      position: relative;
+      z-index: 1;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      transform: scale(0.65);
+      transform-origin: center;
+      animation: containerFadeIn 0.8s ease-out;
+    }
+    
+    @keyframes containerFadeIn {
+      from {
+        opacity: 0;
+        transform: scale(0.6) translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(0.65) translateY(0);
+      }
+    }
+    
+    .container:hover {
+      border-color: var(--accent);
+      box-shadow: 0 12px 40px rgba(220, 38, 38, 0.3);
+    }
+    
+    .page-title {
+      color: var(--accent);
+      font-size: 32px;
+      font-weight: 800;
+      margin-bottom: 20px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3),
+                  0 0 10px rgba(220, 38, 38, 0.3);
+      letter-spacing: 1px;
+      transition: all 0.3s ease;
+      animation: fadeInUp 0.6s ease-out 0.2s backwards;
+    }
+    
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .container:hover .page-title {
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3),
+                  0 0 20px rgba(220, 38, 38, 0.5);
+      transform: scale(1.02);
+    }
+    
+    
+    @keyframes slideInDown {
+      from { 
+        opacity: 0; 
+        transform: translateY(-20px) scale(0.95); 
+      }
+      to { 
+        opacity: 1; 
+        transform: translateY(0) scale(1); 
+      }
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    
+    .input-section {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      align-items: center;
+      animation: fadeInUp 0.6s ease-out backwards;
+    }
+    
+    .input-section:nth-child(1) {
+      animation-delay: 0.3s;
+    }
+    
+    .input-section:nth-child(2) {
+      animation-delay: 0.4s;
+    }
+    
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      flex: 1;
+    }
+    
+    .input-icon {
+      position: absolute;
+      right: 18px;
+      font-size: 20px;
+      color: var(--text-muted);
+      transition: all 0.3s ease;
+      z-index: 2;
+      pointer-events: none;
+    }
+    
+    .input-wrapper:focus-within .input-icon {
+      color: var(--accent);
+      transform: scale(1.1);
+    }
+    
+    .input-field {
+      flex: 1;
+      width: 100%;
+      padding: 20px 50px 20px 20px;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius);
+      background: var(--panel-light);
+      color: var(--text);
+      font-size: 16px;
+      font-family: "Cairo", sans-serif;
+      font-weight: 500;
+      text-align: right;
+      direction: rtl;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2),
+                  0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .input-field:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: #4a4a4a;
+      box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.15),
+                  0 6px 20px rgba(220, 38, 38, 0.2),
+                  0 2px 8px rgba(0, 0, 0, 0.15);
+      transform: translateY(-2px) scale(1.01);
+      padding-right: 55px;
+    }
+    
+    .input-field:hover:not(:focus) {
+      background: #434343;
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25),
+                  0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+    
+    .input-field::placeholder {
+      color: var(--text-muted);
+      font-weight: 400;
+      transition: all 0.3s ease;
+    }
+    
+    .input-field:focus::placeholder {
+      color: #999;
+      transform: translateX(-5px);
+    }
+    
+    .input-field:not(:placeholder-shown) {
+      border-color: rgba(220, 38, 38, 0.2);
+    }
+    
+    .btn-add {
+      background: linear-gradient(135deg, var(--btn), var(--accent-light));
+      color: white;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: var(--radius);
+      padding: 18px 32px;
+      font-family: "Cairo", sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3),
+                  0 2px 4px rgba(0, 0, 0, 0.2);
+      position: relative;
+      overflow: hidden;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+    
+    .btn-add:hover {
+      background: linear-gradient(135deg, var(--accent-light), var(--btn));
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 8px 20px rgba(220, 38, 38, 0.4),
+                  0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    .btn-add:active {
+      transform: translateY(-1px) scale(0.98);
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3),
+                  0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    .btn-add::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s ease;
+    }
+    
+    .btn-add:hover::before {
+      left: 100%;
+    }
+    
+    
+    .library-section {
+      margin-bottom: 15px;
+      animation: fadeInUp 0.6s ease-out 0.8s backwards;
+    }
+    
+    .library-title {
+      color: var(--text);
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      text-align: right;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--panel-light);
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      border: 1px solid rgba(220, 38, 38, 0.2);
+      box-shadow: var(--shadow-light);
+    }
+    
+    .abilities-count {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 700;
+      min-width: 30px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+      animation: pulse 2s infinite;
+    }
+    
+    .abilities-list {
+      background: var(--panel-light);
+      border-radius: var(--radius);
+      padding: 12px;
+      max-height: 120px;
+      overflow-y: auto;
+      border: 1px solid rgba(220, 38, 38, 0.2);
+      box-shadow: var(--shadow-light);
+    }
+    
+    .abilities-list::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .abilities-list::-webkit-scrollbar-track {
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+    }
+    
+    .abilities-list::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border-radius: 3px;
+    }
+    
+    .ability-item {
+      background: linear-gradient(135deg, rgba(51, 65, 85, 0.8), rgba(30, 41, 59, 0.8));
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      direction: rtl;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(10px);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .ability-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+      border-color: rgba(102, 126, 234, 0.3);
+    }
+    
+    .ability-item::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .ability-item:hover::before {
+      opacity: 1;
+    }
+    
+    .ability-text {
+      color: #FFFFFF;
+      font-size: 16px;
+      font-weight: 500;
+      flex: 1;
+      text-align: right;
+      line-height: 1.5;
+    }
+    
+    .delete-btn {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 12px;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+    }
+    
+    .delete-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+    }
+    
+    .distribute-btn {
+      width: 100%;
+      background: linear-gradient(135deg, var(--btn), var(--accent-light));
+      color: white;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: var(--radius);
+      padding: 18px 32px;
+      font-family: "Cairo", sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-bottom: 20px;
+      text-align: center;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3),
+                  0 2px 4px rgba(0, 0, 0, 0.2);
+      position: relative;
+      overflow: hidden;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      animation: fadeInUp 0.6s ease-out 0.5s backwards;
+    }
+    
+    .distribute-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s ease;
+    }
+    
+    .distribute-btn:hover::before {
+      left: 100%;
+    }
+    
+    .distribute-btn:hover {
+      background: linear-gradient(135deg, var(--accent-light), var(--btn));
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 8px 20px rgba(220, 38, 38, 0.4),
+                  0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    .distribute-btn:active {
+      transform: translateY(-1px) scale(0.98);
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3),
+                  0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    .players-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 20px;
+      animation: fadeInUp 0.6s ease-out 0.6s backwards;
+    }
+    
+    .player-container {
+      background: var(--panel-light);
+      border-radius: var(--radius);
+      padding: 15px;
+      border: 1px solid rgba(220, 38, 38, 0.2);
+      box-shadow: var(--shadow-light);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .player-container:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      border-color: var(--accent);
+    }
+    
+    .player-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-light));
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .player-container:hover::before {
+      opacity: 1;
+    }
+    
+    .player-title {
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 15px;
+      text-align: right;
+    }
+    
+    .player-abilities-list {
+      overflow-y: visible;
+    }
+    
+    
+    .player-ability-item {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      direction: rtl;
+      text-align: right;
+      position: relative;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(5px);
+    }
+    
+    .player-ability-item:hover {
+      background: rgba(102, 126, 234, 0.1);
+      border-color: rgba(102, 126, 234, 0.3);
+      transform: translateX(-3px);
+    }
+    
+    .player-ability-item::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      border-radius: 50%;
+      margin-left: 12px;
+      margin-right: 0;
+      flex-shrink: 0;
+      box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+    }
+    
+    .player-ability-text {
+      color: #FFFFFF;
+      font-size: 15px;
+      font-weight: 500;
+      text-align: right;
+      line-height: 1.5;
+      flex: 1;
+    }
+    
+    .start-button {
+      width: 100%;
+      background: linear-gradient(135deg, var(--btn), var(--accent-light));
+      color: white;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: var(--radius);
+      padding: 18px 32px;
+      font-family: "Cairo", sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3),
+                  0 2px 4px rgba(0, 0, 0, 0.2);
+      position: relative;
+      overflow: hidden;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      animation: fadeInUp 0.6s ease-out 0.7s backwards;
+    }
+    
+    .start-button::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s ease;
+    }
+    
+    .start-button:hover::before {
+      left: 100%;
+    }
+    
+    .start-button:hover {
+      background: linear-gradient(135deg, var(--accent-light), var(--btn));
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 8px 20px rgba(220, 38, 38, 0.4),
+                  0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    .start-button:active {
+      transform: translateY(-1px) scale(0.98);
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3),
+                  0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    .empty-state {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 14px;
+      text-align: center;
+      padding: 25px;
+      font-style: italic;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    @media (max-width: 768px) {
+      body {
+        transform: scale(0.9);
+        padding: 10px;
+      }
+      
+      .container {
+        max-width: 100%;
+        padding: 20px;
+        border-radius: 15px;
+      }
+      
+      .page-title {
+        font-size: 28px;
+      }
+      
+      .players-section {
+        grid-template-columns: 1fr;
+        gap: 15px;
+      }
+      
+      .input-section {
+        flex-direction: column;
+        gap: 10px;
+      }
+      
+      
+      .btn-add {
+        width: 100%;
+        padding: 12px 16px;
+      }
+      
+      .library-title {
+        font-size: 18px;
+        padding: 12px 16px;
+      }
+      
+      .abilities-list {
+        max-height: 150px;
+      }
+      
+      .player-container {
+        padding: 15px;
+      }
+      
+      .start-button {
+        font-size: 18px;
+        padding: 16px 20px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      body {
+        transform: scale(0.8);
+        padding: 5px;
+      }
+      
+      .container {
+        padding: 15px;
+        border-radius: 12px;
+      }
+      
+      .page-title {
+        font-size: 24px;
+      }
+      
+      .input-field {
+        font-size: 14px;
+        padding: 12px 14px;
+      }
+      
+      .btn-add, .btn-restore, .distribute-btn {
+        font-size: 13px;
+        padding: 12px 16px;
+      }
+      
+      .start-button {
+        font-size: 16px;
+        padding: 14px 18px;
+      }
+    }
+    
+    .home-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #dc2626, #b91c1c);
+      border: 3px solid white;
+      border-radius: 12px;
+      color: #fff;
+      padding: 10px 24px;
+      font-size: 16px;
+      font-family: "Cairo", sans-serif;
+      font-weight: 900;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 6px 20px rgba(220, 38, 38, 0.5), 0 0 30px rgba(220, 38, 38, 0.3);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+    .home-btn:hover {
+      transform: translateY(-3px) scale(1.05);
+      box-shadow: 0 8px 25px rgba(220, 38, 38, 0.7), 0 0 40px rgba(220, 38, 38, 0.5);
+      border-color: #fbbf24;
+      background: linear-gradient(135deg, #b91c1c, #991b1b);
+    }
+    .home-btn::before {
+      content: '🏠';
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="video-background" style="background-image: url('images/QG14Background.png'); background-size: cover; background-position: center; background-repeat: no-repeat;"></div>
+  
+  <!-- Home Button (shown only in tournament mode) -->
+  <a href="tournament-bracket.html" class="home-btn" id="homeBtn" style="display: none;">العودة للجدول</a>
+  
+  <div class="container">
+    <h1 class="page-title">القدرات</h1>
+    
+    <div class="input-section">
+      <div class="input-wrapper">
+        <span class="input-icon">✨</span>
+        <input 
+          type="text" 
+          class="input-field" 
+          id="customAbility" 
+          placeholder="أضف قدرة جديدة..."
+        >
+      </div>
+      <button class="btn-add" onclick="addCustomAbility()">
+        إضافة
+      </button>
+    </div>
+    
+    <div class="input-section">
+      <div class="input-wrapper">
+        <span class="input-icon">📝</span>
+        <textarea 
+          class="input-field" 
+          id="bulkAbilities" 
+          placeholder="أضف عدة قدرات مرة واحدة (كل قدرة في سطر منفصل)..."
+          style="height: 80px; resize: vertical; padding-top: 20px; padding-bottom: 20px;"
+        ></textarea>
+      </div>
+    </div>
+    
+    
+    <div class="library-section">
+      <div class="library-title">
+        <span>القائمة الحالية للقدرات:</span>
+        <span class="abilities-count" id="abilitiesCount">0</span>
+      </div>
+      <div class="abilities-list" id="allAbilitiesList">
+        <!-- سيتم ملؤها بـ JavaScript -->
+      </div>
+    </div>
+    
+    <button class="distribute-btn" onclick="distributeAbilities()">
+      توزيع ٣ قدرات عشوائية لكل لاعب (بدون تكرار)
+    </button>
+    
+    <div class="players-section">
+      <div class="player-container">
+        <div class="player-title" id="player1Title">اللاعب الأول - القدرات</div>
+        <div class="player-abilities-list" id="player1Abilities">
+          <!-- سيتم ملؤها بـ JavaScript -->
+        </div>
+      </div>
+      
+      <div class="player-container">
+        <div class="player-title" id="player2Title">اللاعب الثاني - القدرات</div>
+        <div class="player-abilities-list" id="player2Abilities">
+          <!-- سيتم ملؤها بـ JavaScript -->
+        </div>
+      </div>
+    </div>
+    
+    <button class="start-button" id="nextBtn" onclick="nextStep()">
+      إبدأ
+    </button>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module" src="js/firebase-init.js"></script>
+  <script type="module" src="js/auth-service.js"></script>
+  
+  <script type="module" src="js/abilities-setup.js"></script>
+</body>
+</html>

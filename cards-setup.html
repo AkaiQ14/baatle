@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>اختيار الكروت - تحدي كروت الأنمي</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #8B1538;
+      --dark-bg: #2d2d2db3;
+      --input-bg: #afa2a26b;
+      --text: #FFFFFF;
+      --blue: #4A90E2;
+      --red: #FF6B6B;
+      --yellow: #6B7280;
+      --yellow-light: #9CA3AF;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: "Cairo", sans-serif;
+      background: #8B1538;
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      position: relative;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    
+    .video-background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      object-fit: cover;
+    }
+    
+    
+    .container {
+      width: 100%;
+      max-width: 900px;
+      position: relative;
+      z-index: 1;
+      transform: scale(0.95);
+      padding: 30px;
+    }
+    
+    .page-title {
+      color: var(--text);
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    
+    .current-player-section {
+      color: var(--text);
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+    
+    
+    
+    
+    
+    .continue-section {
+      text-align: center;
+      margin-bottom: 20px;
+      margin-left: 20px;
+      margin-right: 20px;
+    }
+    
+    .continue-btn {
+      background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+      color: var(--text);
+      border: 2px solid #FFD700;
+      border-radius: 15px;
+      padding: 16px 32px;
+      font-size: 18px;
+      font-weight: 700;
+      font-family: "Cairo", sans-serif;
+      cursor: pointer;
+      width: auto;
+      max-width: 250px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 
+        0 8px 25px rgba(76, 175, 80, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .continue-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, 
+        transparent, 
+        rgba(255, 255, 255, 0.2), 
+        transparent);
+      transition: left 0.5s ease;
+    }
+    
+    .continue-btn:hover::before {
+      left: 100%;
+    }
+    
+    .continue-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 
+        0 12px 35px rgba(76, 175, 80, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      background: linear-gradient(135deg, #5CBF60 0%, #4CAF50 100%);
+      border-color: #FFA500;
+    }
+    
+    .continue-btn:active {
+      transform: translateY(-1px);
+      box-shadow: 
+        0 6px 20px rgba(76, 175, 80, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    
+    .random-section {
+      text-align: center;
+      margin-bottom: 20px;
+      margin-left: 20px;
+      margin-right: 20px;
+    }
+    
+    .random-btn {
+      background: linear-gradient(135deg, #FF6B6B 0%, #FF5252 100%);
+      color: var(--text);
+      border: 2px solid #FFD700;
+      border-radius: 15px;
+      padding: 16px 32px;
+      font-size: 18px;
+      font-weight: 700;
+      font-family: "Cairo", sans-serif;
+      cursor: pointer;
+      width: auto;
+      max-width: 250px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 
+        0 8px 25px rgba(255, 107, 107, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .random-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, 
+        transparent, 
+        rgba(255, 255, 255, 0.2), 
+        transparent);
+      transition: left 0.5s ease;
+    }
+    
+    .random-btn:hover::before {
+      left: 100%;
+    }
+    
+    .random-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 
+        0 12px 35px rgba(255, 107, 107, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      background: linear-gradient(135deg, #FF7B7B 0%, #FF6B6B 100%);
+      border-color: #FFA500;
+    }
+    
+    .random-btn:active {
+      transform: translateY(-1px);
+      box-shadow: 
+        0 6px 20px rgba(255, 107, 107, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-bottom: 25px;
+      padding: 20px;
+      justify-content: center;
+      direction: ltr;
+    }
+    
+    .card-number {
+      width: 200px;
+      height: 80px;
+      background: #FFD700;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 700;
+      color: #000;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+      margin: 0 auto;
+    }
+    
+    .card-number:hover {
+      background: #d69a29;
+      transform: translateY(-2px) scale(1.05);
+      box-shadow: 0 6px 20px rgba(255, 165, 0, 0.5);
+    }
+    
+    .card-number.selected {
+      background: #b68410;
+      border: 2px solid #8B4513;
+      color: #000;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    
+
+    
+    @media (max-width: 768px) {
+      .container {
+        max-width: 100%;
+        padding: 20px;
+        transform: scale(1);
+      }
+      
+      .current-player-section {
+        padding: 20px 30px;
+        font-size: 24px;
+        margin-left: auto;
+        margin-right: auto;
+        min-height: 80px;
+        max-width: 500px;
+      }
+      
+      .continue-btn {
+        padding: 14px 28px;
+        font-size: 16px;
+        border-radius: 12px;
+      }
+      
+      .random-btn {
+        padding: 14px 28px;
+        font-size: 16px;
+        border-radius: 12px;
+      }
+      
+      .cards-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        padding: 15px;
+        justify-content: center;
+        direction: ltr;
+      }
+      
+      .card-number {
+        width: 80px;
+        height: 65px;
+        font-size: 20px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .container {
+        padding: 15px;
+      }
+      
+      .current-player-section {
+        padding: 15px 25px;
+        font-size: 22px;
+        min-height: 70px;
+        max-width: 400px;
+      }
+      
+      .cards-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 5px;
+        padding: 10px;
+        justify-content: center;
+        direction: ltr;
+      }
+      
+      .card-number {
+        width: 70px;
+        height: 55px;
+        font-size: 18px;
+      }
+    }
+    
+    .home-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #dc2626, #b91c1c);
+      border: 3px solid white;
+      border-radius: 12px;
+      color: #fff;
+      padding: 10px 24px;
+      font-size: 16px;
+      font-family: "Cairo", sans-serif;
+      font-weight: 900;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 6px 20px rgba(220, 38, 38, 0.5), 0 0 30px rgba(220, 38, 38, 0.3);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+    .home-btn:hover {
+      transform: translateY(-3px) scale(1.05);
+      box-shadow: 0 8px 25px rgba(220, 38, 38, 0.7), 0 0 40px rgba(220, 38, 38, 0.5);
+      border-color: #fbbf24;
+      background: linear-gradient(135deg, #b91c1c, #991b1b);
+    }
+    .home-btn::before {
+      content: '🏠';
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="video-background" style="background-image: url('images/QG14Background.png'); background-size: cover; background-position: center; background-repeat: no-repeat;"></div>
+  
+  <!-- Home Button (shown only in tournament mode) -->
+  <a href="tournament-bracket.html" class="home-btn" id="homeBtn" style="display: none;">العودة للجدول</a>
+  
+  <div class="container">
+    <div class="current-player-section" id="currentPlayerSection">
+      <span class="player-name" id="currentPlayerName">اكاي</span>
+      <span class="instruction-text" id="instructionText">اختر 11 كرت</span>
+    </div>
+    
+    <div class="cards-grid" id="cardsGrid">
+      <!-- سيتم ملؤها بـ JavaScript -->
+    </div>
+    
+    <div class="continue-section" id="continueSection" style="display: none;">
+      <button class="continue-btn" id="continueBtn" onclick="continueToNextPlayer()">
+        تأكيد الاختيارات
+      </button>
+    </div>
+    
+    <div class="random-section" id="randomSection">
+      <button class="random-btn" id="randomBtn" onclick="selectRandomCards()">
+        اختيار عشوائي
+      </button>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module" src="js/firebase-init.js"></script>
+  <script type="module" src="js/auth-service.js"></script>
+  
+  <script src="js/card-manager.js"></script>
+  <script type="module" src="js/cards-setup.js"></script>
+</body>
+</html> 

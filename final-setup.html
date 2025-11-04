@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #4B0E1F;
+      --dark-bg: #2d2d2db3;
+      --input-bg: #afa2a26b;
+      --text: #FFFFFF;
+      --blue: #4A90E2;
+      --red: #FF6B6B;
+      --yellow: #ffffff;
+      --yellow-light: #ffffff;
+      --purple: #8B5CF6;
+      --green: #10B981;
+      --dark-green: #059669;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: "Cairo", sans-serif;
+      background: #4B0E1F;
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      position: relative;
+      box-sizing: border-box;
+      font-weight: bold;
+    }
+    
+    .video-background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      object-fit: cover;
+    }
+    
+    
+    .main-title {
+      font-size: 3rem;
+      font-weight: 900;
+      color: white;
+      text-align: center;
+      margin-bottom: 2rem;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+    
+    .container {
+      width: 100%;
+      max-width: 500px;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .copy-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+    
+    .button-container {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      gap: 15px;
+    }
+    
+    .copy-btn {
+      flex: 1;
+      padding: 15px 25px;
+      border: none;
+      border-radius: 8px;
+      font-family: "Cairo", sans-serif;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      min-height: 60px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .player1-btn {
+      background: linear-gradient(145deg, #ff8c00, #ff7f00, #ff6b00);
+      color: #ffffff;
+      border: 2px solid #ffffff;
+      box-shadow: 0 6px 20px rgba(255, 140, 0, 0.4);
+    }
+    
+    .player1-btn:hover {
+      background: linear-gradient(145deg, #ff9f1a, #ff8c00, #ff7f00);
+      color: #ffffff;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(255, 140, 0, 0.5);
+    }
+    
+    .player2-btn {
+      background: linear-gradient(145deg, #ff6b6b, #e63946, #c92a2a);
+      color: #ffffff;
+      border: 2px solid #ffffff;
+      box-shadow: 0 6px 20px rgba(230, 57, 70, 0.35);
+    }
+    
+    .player2-btn:hover {
+      background: linear-gradient(145deg, #ff7b7b, #ff4d5a, #e63946);
+      color: #ffffff;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(230, 57, 70, 0.45);
+      border: 2px solid #ffffff;
+    }
+    
+    .battle-btn {
+      background: linear-gradient(145deg, #32c675, #28a745, #1e7e34);
+      color: #ffffff;
+      border: 2px solid #ffffff;
+      box-shadow: 0 6px 20px rgba(50, 198, 117, 0.4);
+    }
+    
+    .battle-btn:hover {
+      background: linear-gradient(145deg, #3dd47a, #32c675, #28a745);
+      color: #ffffff;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(50, 198, 117, 0.5);
+      border: 2px solid #ffffff;
+    }
+    
+    .battle-btn:disabled {
+      background: #cccccc;
+      color: #666666;
+      border: 2px solid #cccccc;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .battle-btn:disabled:hover {
+      background: #cccccc;
+      color: #666666;
+      transform: none;
+    }
+    
+    /* Shimmer sweep animation like buttons in card.html */
+    .copy-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -120%;
+      width: 140%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+      pointer-events: none;
+      animation: shimmerSweep 2.2s linear infinite;
+    }
+
+    .copy-btn:hover::before {
+      left: 120%;
+    }
+
+    @keyframes shimmerSweep {
+      0% { left: -120%; }
+      100% { left: 120%; }
+    }
+
+    .copy-btn.copied {
+      background: #28A745 !important;
+      color: white !important;
+      border: 2px solid #28A745 !important;
+    }
+    
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      margin-right: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      min-width: 80px;
+      justify-content: center;
+    }
+    
+    .status-pending {
+      color: #FFA500;
+    }
+    
+    .status-completed {
+      color: #28A745;
+    }
+    
+    .checkmark-box {
+      width: 16px;
+      height: 12px;
+      background: #28A745;
+      border-radius: 2px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 6px;
+    }
+    
+    .checkmark {
+      color: white;
+      font-size: 10px;
+      font-weight: bold;
+    }
+    
+    .status-text {
+      color: #28A745;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      min-width: 80px;
+      justify-content: center;
+    }
+    
+    .loading-spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #FFA500;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* Ability panels like in the image */
+    .abilities-container {
+      display: flex;
+      gap: 20px;
+      width: 100%;
+      max-width: 1200px;
+      margin-top: 2rem;
+      position: relative;
+      z-index: 10;
+    }
+    
+    .ability-panel {
+      flex: 1;
+      background: rgba(75, 14, 31, 0.3);
+      border: 2px solid #FFD700;
+      border-radius: 12px;
+      padding: 20px;
+      min-height: 250px;
+      position: relative;
+      z-index: 10;
+      backdrop-filter: blur(10px);
+    }
+    
+    .ability-panel-title {
+      color: white;
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    
+    .ability-panel-subtitle {
+      color: white;
+      font-size: 14px;
+      font-weight: bold;
+      text-align: right;
+      margin-bottom: 15px;
+    }
+    
+    /* Toast notifications */
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      border: 2px solid var(--green);
+      font-family: "Cairo", sans-serif;
+      font-weight: 600;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .toast.show {
+      opacity: 1;
+    }
+    
+    .ability-item {
+      background: #FFD700;
+      color: #000;
+      padding: 12px 16px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      text-align: center;
+      border: 1px solid #FFD700;
+      backdrop-filter: blur(5px);
+    }
+    
+    .status-message {
+      background: transparent;
+      color: var(--green);
+      padding: 8px 15px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: bold;
+      text-align: center;
+      margin: 5px 0;
+      border: 2px solid var(--green);
+      display: none;
+      position: relative;
+    }
+    
+    .status-message::before {
+      content: '✓';
+      color: var(--green);
+      font-weight: bold;
+      font-size: 16px;
+      margin-left: 8px;
+      display: inline-block;
+    }
+    
+    .status-message.show {
+      display: block;
+      animation: slideIn 0.3s ease-out;
+    }
+    
+
+    
+    @media (max-width: 768px) {
+      .main-title {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+      }
+      
+      .container {
+        max-width: 100%;
+      }
+      
+      .copy-btn {
+        padding: 12px 20px;
+        font-size: 14px;
+        min-height: 50px;
+      }
+      
+      .abilities-container {
+        flex-direction: column;
+        gap: 15px;
+      }
+      
+      .ability-panel {
+        min-height: 150px;
+      }
+      
+      .button-container {
+        flex-direction: column;
+        gap: 10px;
+      }
+      
+      .status-message {
+        margin: 10px 0;
+      }
+    }
+    
+    @keyframes scaleIn {
+      from { 
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0;
+      }
+      to { 
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+      }
+    }
+    
+    @keyframes fadeOut {
+      from { 
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+      }
+      to { 
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0;
+      }
+    }
+    
+    @keyframes slideIn {
+      from { 
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to { 
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+  </style>
+</head>
+<body>
+  <div class="video-background" style="background-image: url('images/QG14Background.png'); background-size: cover; background-position: center; background-repeat: no-repeat;"></div>
+  <h1 class="main-title"></h1>
+  
+  <div class="container">
+    <div class="copy-buttons">
+      <div class="button-container">
+        <button class="copy-btn player1-btn" onclick="copyPlayerLink('player1')">
+          نسخ رابط ترتيب البطاقات لـ <span id="player1Name">اللاعب الأول</span>
+        </button>
+        <div class="status-message" id="player1StatusMessage">تم الاستلام</div>
+      </div>
+      
+      <div class="button-container">
+        <button class="copy-btn player2-btn" onclick="copyPlayerLink('player2')">
+          نسخ رابط ترتيب البطاقات لـ <span id="player2Name">اللاعب الثاني</span>
+        </button>
+        <div class="status-message" id="player2StatusMessage">تم الاستلام</div>
+      </div>
+      
+      <div class="button-container">
+      <button class="copy-btn battle-btn" id="battleBtn" disabled>
+        بدء المعركة
+      </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ability panels like in the image -->
+  <div class="abilities-container">
+    <div class="ability-panel">
+      <div class="ability-panel-title" id="player1AbilitiesTitle">قدرات <span id="player1AbilitiesName">اللاعب الأول</span></div>
+      <div class="ability-panel-subtitle">عرض فقط</div>
+      <div id="player1AbilitiesList">
+        <!-- Abilities will be populated here -->
+      </div>
+    </div>
+    
+    <div class="ability-panel">
+      <div class="ability-panel-title" id="player2AbilitiesTitle">قدرات <span id="player2AbilitiesName">اللاعب الثاني</span></div>
+      <div class="ability-panel-subtitle">عرض فقط</div>
+      <div id="player2AbilitiesList">
+        <!-- Abilities will be populated here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module" src="js/firebase-init.js"></script>
+  <script type="module" src="js/auth-service.js"></script>
+  
+  <script type="module" src="js/final-setup.js"></script>
+  
+  <!-- ✅ تم حذف دالة startBattle() المكررة - الآن تستخدم الدالة من final-setup.js -->
+</body>
+</html> 
