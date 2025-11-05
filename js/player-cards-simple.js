@@ -1086,6 +1086,72 @@ async function loadGameData() {
             selectedCards = [];
             isSelectionPhase = true;
           } else {
+            // ✅ تنظيف التكرارات عند التحميل
+            const cleanedSelectedCards = [];
+            const seenSlotIndices = new Set();
+            const seenCardPaths = new Set();
+            
+            selectedCards.forEach(sc => {
+              if (!sc || typeof sc !== 'object') return;
+              
+              const slotIndex = sc.slotIndex;
+              const cardPath = sc.cardPath || sc;
+              const normalizedCardPath = normalizeCardPath(cardPath);
+              
+              // التحقق من صحة البيانات
+              if (slotIndex === undefined || slotIndex === null || !cardPath || !normalizedCardPath) {
+                console.warn('⚠️ كرت غير صالح في selectedCards:', sc);
+                return;
+              }
+              
+              // التحقق من عدم وجود تكرار في slotIndex
+              if (seenSlotIndices.has(slotIndex)) {
+                console.warn(`⚠️ تكرار slotIndex ${slotIndex} - تم تجاهل الكرت:`, sc);
+                return;
+              }
+              
+              // التحقق من عدم وجود تكرار في cardPath (مطبق بشكل تطبيعي)
+              if (seenCardPaths.has(normalizedCardPath)) {
+                console.warn(`⚠️ تكرار cardPath ${cardPath} - تم تجاهل الكرت:`, sc);
+                return;
+              }
+              
+              // إضافة الكرت بعد التحقق من عدم وجود تكرار
+              cleanedSelectedCards.push(sc);
+              seenSlotIndices.add(slotIndex);
+              seenCardPaths.add(normalizedCardPath);
+            });
+            
+            // استبدال selectedCards بالنسخة المنظفة
+            if (cleanedSelectedCards.length !== selectedCards.length) {
+              console.log(`🧹 تم تنظيف ${selectedCards.length - cleanedSelectedCards.length} كرت مكرر من selectedCards`);
+              selectedCards = cleanedSelectedCards;
+              
+              // حفظ النسخة المنظفة
+              const savedSelectedCardsKey = `${playerParam}SelectedCards_${gameId}`;
+              localStorage.setItem(savedSelectedCardsKey, JSON.stringify(selectedCards));
+            }
+            
+            // ✅ التحقق النهائي من عدم وجود تكرار
+            const finalNormalized = selectedCards.map(sc => normalizeCardPath(sc.cardPath || sc)).filter(n => n !== null);
+            const finalUnique = new Set(finalNormalized);
+            if (finalNormalized.length !== finalUnique.size) {
+              console.error('❌ لا يزال هناك تكرار بعد التنظيف - إعادة تنظيف');
+              // إعادة التنظيف بشكل أكثر صرامة
+              const uniqueSelectedCards = [];
+              const finalSeen = new Set();
+              selectedCards.forEach(sc => {
+                const normalized = normalizeCardPath(sc.cardPath || sc);
+                if (normalized && !finalSeen.has(normalized)) {
+                  finalSeen.add(normalized);
+                  uniqueSelectedCards.push(sc);
+                }
+              });
+              selectedCards = uniqueSelectedCards;
+              const savedSelectedCardsKey = `${playerParam}SelectedCards_${gameId}`;
+              localStorage.setItem(savedSelectedCardsKey, JSON.stringify(selectedCards));
+            }
+            
             // ✅ تحميل حالة isSelectionPhase من localStorage
             const savedIsSelectionPhase = localStorage.getItem(`${playerParam}IsSelectionPhase_${gameId}`);
             if (savedIsSelectionPhase !== null) {
@@ -2499,6 +2565,37 @@ function renderCardSelectionGrid(slots) {
       try {
         selectedCards = JSON.parse(savedSelectedCards);
         console.log(`✅ تم تحميل ${selectedCards.length} كرت مختار في renderCardSelectionGrid`);
+        
+        // ✅ تنظيف التكرارات عند التحميل
+        if (Array.isArray(selectedCards) && selectedCards.length > 0) {
+          const cleanedSelectedCards = [];
+          const seenSlotIndices = new Set();
+          const seenCardPaths = new Set();
+          
+          selectedCards.forEach(sc => {
+            if (!sc || typeof sc !== 'object') return;
+            
+            const slotIndex = sc.slotIndex;
+            const cardPath = sc.cardPath || sc;
+            const normalizedCardPath = normalizeCardPath(cardPath);
+            
+            if (slotIndex === undefined || slotIndex === null || !cardPath || !normalizedCardPath) {
+              return;
+            }
+            
+            if (!seenSlotIndices.has(slotIndex) && !seenCardPaths.has(normalizedCardPath)) {
+              cleanedSelectedCards.push(sc);
+              seenSlotIndices.add(slotIndex);
+              seenCardPaths.add(normalizedCardPath);
+            }
+          });
+          
+          if (cleanedSelectedCards.length !== selectedCards.length) {
+            console.log(`🧹 تم تنظيف ${selectedCards.length - cleanedSelectedCards.length} كرت مكرر في renderCardSelectionGrid`);
+            selectedCards = cleanedSelectedCards;
+            localStorage.setItem(savedSelectedCardsKey, JSON.stringify(selectedCards));
+          }
+        }
       } catch (e) {
         console.error('❌ خطأ في تحميل الكروت المختارة في renderCardSelectionGrid:', e);
       }
@@ -2815,11 +2912,66 @@ async function openCardSelectionModal(slotIndex, slotCards) {
     
     // حدث النقر
     cardOption.onclick = async () => {
-      // حفظ الاختيار
+      // ✅ فحص قوي لمنع التكرار قبل الإضافة
+      const normalizedCardPath = normalizeCardPath(cardPath);
+      
+      // التحقق من عدم وجود نفس slotIndex
+      const existingSlot = selectedCards.find(sc => sc.slotIndex === slotIndex);
+      if (existingSlot) {
+        console.error(`❌ تكرار: slotIndex ${slotIndex} تم اختياره مسبقاً`);
+        alert('هذه البطاقة تم اختيارها بالفعل');
+        return;
+      }
+      
+      // التحقق من عدم وجود نفس cardPath (مطبق بشكل تطبيعي) في أي slot آخر
+      const existingCard = selectedCards.find(sc => {
+        const normalizedExisting = normalizeCardPath(sc.cardPath);
+        return normalizedExisting && normalizedCardPath && normalizedExisting === normalizedCardPath;
+      });
+      
+      if (existingCard) {
+        console.error(`❌ تكرار: الكرت ${cardPath} تم اختياره مسبقاً في slot ${existingCard.slotIndex}`);
+        alert(`⚠️ هذا الكرت تم اختياره مسبقاً في بطاقة أخرى. يرجى اختيار كرت مختلف.`);
+        return;
+      }
+      
+      // ✅ التحقق من صحة البيانات قبل الإضافة
+      if (!normalizedCardPath || !cardPath) {
+        console.error('❌ كرت غير صالح:', cardPath);
+        alert('⚠️ خطأ: كرت غير صالح. يرجى المحاولة مرة أخرى.');
+        return;
+      }
+      
+      // ✅ حفظ الاختيار بعد التحقق من عدم وجود تكرار
       selectedCards.push({
         slotIndex: slotIndex,
         cardPath: cardPath
       });
+      
+      console.log(`✅ تم اختيار كرت ${cardPath} للبطاقة ${slotIndex + 1} (إجمالي: ${selectedCards.length}/${rounds})`);
+      
+      // ✅ فحص نهائي للتأكد من عدم وجود تكرار بعد الإضافة
+      const finalNormalized = selectedCards.map(sc => normalizeCardPath(sc.cardPath || sc)).filter(n => n !== null);
+      const finalUnique = new Set(finalNormalized);
+      if (finalNormalized.length !== finalUnique.size) {
+        console.error('❌ تم اكتشاف تكرار بعد الإضافة - إزالة التكرار');
+        // إزالة التكرارات
+        const uniqueSelectedCards = [];
+        const seenNormalized = new Set();
+        const seenSlotIndices = new Set();
+        
+        selectedCards.forEach(sc => {
+          const normalized = normalizeCardPath(sc.cardPath || sc);
+          if (normalized && !seenNormalized.has(normalized) && !seenSlotIndices.has(sc.slotIndex)) {
+            seenNormalized.add(normalized);
+            seenSlotIndices.add(sc.slotIndex);
+            uniqueSelectedCards.push(sc);
+          }
+        });
+        
+        selectedCards = uniqueSelectedCards;
+        console.log(`🧹 تم تنظيف التكرار - الكروت المتبقية: ${selectedCards.length}`);
+      }
       
       // ✅ حفظ مع gameId لتجنب التضارب بين الألعاب
       const savedSelectedCardsKey = `${playerParam}SelectedCards_${gameId}`;
