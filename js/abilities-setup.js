@@ -301,9 +301,17 @@ function displayAllAbilities() {
     abilityDiv.className = 'ability-item';
     abilityDiv.innerHTML = `
       <span class="ability-text">${ability}</span>
-      <button class="delete-btn" onclick="deleteAbility(${index})">×</button>
+      <button class="delete-btn" data-index="${index}">×</button>
     `;
     container.appendChild(abilityDiv);
+  });
+  
+  // Attach event listeners to delete buttons using event delegation
+  container.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const index = parseInt(this.getAttribute('data-index'));
+      deleteAbility(index);
+    });
   });
 }
 
@@ -452,6 +460,24 @@ function setupEventListeners() {
       addCustomAbility();
     }
   });
+  
+  // Add ability button
+  const addAbilityBtn = document.getElementById('addAbilityBtn');
+  if (addAbilityBtn) {
+    addAbilityBtn.addEventListener('click', addCustomAbility);
+  }
+  
+  // Distribute abilities button
+  const distributeBtn = document.getElementById('distributeBtn');
+  if (distributeBtn) {
+    distributeBtn.addEventListener('click', distributeAbilities);
+  }
+  
+  // Next step button
+  const nextBtn = document.getElementById('nextBtn');
+  if (nextBtn) {
+    nextBtn.addEventListener('click', nextStep);
+  }
 }
 
 function saveProgress() {
