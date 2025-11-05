@@ -466,6 +466,7 @@ async function generateCardSlotsForPlayer() {
   
   // ✅ جلب الكروت المستخدمة للاعب الآخر (cardSlots + الكروت المختارة) - فقط للعبة الحالية
   let usedCardsByOpponent = [];
+  const normalizedOpponentSet = new Set();
   if (gameId) {
     try {
       // تحديد اللاعب الآخر
@@ -550,6 +551,12 @@ async function generateCardSlotsForPlayer() {
       });
       usedCardsByOpponent = uniqueUsed;
       
+      // ✅ إضافة الكروت المستبعدة إلى normalizedOpponentSet
+      usedCardsByOpponent.forEach(c => {
+        const n = normalizeCardPath(c);
+        if (n) normalizedOpponentSet.add(n);
+      });
+      
     } catch (e) {
       console.warn('⚠️ لم يتم العثور على كروت للاعب الآخر أو حدث خطأ:', e);
     }
@@ -560,15 +567,12 @@ async function generateCardSlotsForPlayer() {
   const epicCards = window.cardManager.getAllCardsByCategory('epic') || [];
   
   // ✅ استبعاد الكروت المستخدمة للاعب الآخر باستخدام مقارنة تطبيعية
-  const normalizedUsedCards = usedCardsByOpponent.map(card => normalizeCardPath(card));
-  const availableCommon = commonCards.filter(card => {
-    const normalizedCard = normalizeCardPath(card);
-    return !normalizedUsedCards.includes(normalizedCard);
-  });
-  const availableEpic = epicCards.filter(card => {
-    const normalizedCard = normalizeCardPath(card);
-    return !normalizedUsedCards.includes(normalizedCard);
-  });
+  const availableCommon = commonCards.filter(card => 
+    !normalizedOpponentSet.has(normalizeCardPath(card))
+  );
+  const availableEpic = epicCards.filter(card => 
+    !normalizedOpponentSet.has(normalizeCardPath(card))
+  );
   
   console.log(`📊 الكروت المتاحة: ${availableCommon.length} common, ${availableEpic.length} epic`);
   console.log(`📊 الكروت المستبعدة: ${usedCardsByOpponent.length} كرت`);
@@ -695,6 +699,9 @@ async function generateCardSlotsForPlayer() {
   const totalSlots = 20;
   const playerCardSlots = [];
   
+  // ✅ منع التكرار داخل اللاعب نفسه
+  const globalUsed = new Set();
+  
   // ✅ دالة للحصول على كرت عشوائي بشكل عادل (استخدام crypto.getRandomValues)
   const getRandomCard = (availableCards) => {
     if (availableCards.length === 0) return null;
@@ -708,7 +715,10 @@ async function generateCardSlotsForPlayer() {
   // ✅ دالة لإنشاء مجموعة من 3 كروت فريدة مع توزيع عادل
   const createSlot = (usedCards, slotIndex, availableCardsPool) => {
     const slotCards = [];
-    const availableForSlot = availableCardsPool.filter(card => !usedCards.includes(card));
+    const availableForSlot = availableCardsPool.filter(card => 
+      !usedCards.includes(card) &&
+      !globalUsed.has(normalizeCardPath(card))
+    );
     
     // ✅ توزيع عادل: محاولة الحصول على مزيج من common و epic لكل بطاقة
     const availableCommonForSlot = availableForSlot.filter(card => availableCommon.includes(card));
@@ -735,6 +745,7 @@ async function generateCardSlotsForPlayer() {
       
       if (randomCard && !slotCards.includes(randomCard)) {
         slotCards.push(randomCard);
+        globalUsed.add(normalizeCardPath(randomCard));
         // إزالة الكرت من القائمة المتاحة لهذا السلوط
         const index = availableForSlot.indexOf(randomCard);
         if (index > -1) {
@@ -755,6 +766,7 @@ async function generateCardSlotsForPlayer() {
           randomCard = availableForSlot[0];
           if (!slotCards.includes(randomCard)) {
             slotCards.push(randomCard);
+            globalUsed.add(normalizeCardPath(randomCard));
             availableForSlot.splice(0, 1);
           }
         }
@@ -786,6 +798,7 @@ async function generateCardSlotsForPlayer() {
         const randomCard = getRandomCard(remainingCards);
         if (randomCard && !slotCards.includes(randomCard)) {
           slotCards.push(randomCard);
+          globalUsed.add(normalizeCardPath(randomCard));
           allUsedCards.push(randomCard);
           const index = remainingCards.indexOf(randomCard);
           if (index > -1) {
@@ -970,6 +983,20 @@ async function loadGameData() {
             validationResult = await validateNoDuplicatesBetweenPlayers(cardSlots, gameId);
             
             if (validationResult.isValid) {
+              // ✅ فحص التكرار داخل اللاعب نفسه قبل الحفظ
+              const flat = cardSlots.flat();
+              const normalized = flat.map(c => normalizeCardPath(c)).filter(n => n !== null);
+              const unique = new Set(normalized);
+              if (unique.size !== normalized.length) {
+                console.error("❌ تكرار داخلي للاعب — سيتم إعادة التوليد");
+                validationResult.isValid = false; // تعيين الحالة لتكملة الحلقة
+                attempts++;
+                if (attempts < maxAttempts) {
+                  await new Promise(resolve => setTimeout(resolve, 300));
+                }
+                continue; // يعيد المحاولة
+              }
+              
               // ✅ لا توجد تكرارات - حفظ في Firebase
               try {
                 await GameService.savePlayerCardSlots(gameId, player, cardSlots);
