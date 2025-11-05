@@ -210,21 +210,6 @@ export class GameService {
     });
   }
   
-  // ✅ حفظ حالة modal مفتوح (حماية من الغش)
-  static async savePlayerOpenModal(gameId, player, openModalData) {
-    // Ensure db is initialized
-    if (!db) {
-      const app = getApp();
-      db = getFirestore(app);
-    }
-    
-    const gameRef = doc(db, 'games', gameId);
-    await updateDoc(gameRef, {
-      [`player${player}.openModal`]: openModalData,
-      updatedAt: new Date()
-    });
-  }
-  
   // حفظ ترتيب البطاقات
   static async saveCardOrder(gameId, player, cardOrder) {
     // Ensure db is initialized

@@ -124,6 +124,56 @@ const STRATEGIC_GAME_ID_KEY = `${playerParam}_StrategicGameId`;
 const LAST_LOAD_TIME_KEY = `${playerParam}_LastLoadTime`;
 const LAST_SUBMIT_TIME_KEY = `${playerParam}_LastSubmitTime`;
 
+// ------------------- Persist last-open slot (to survive page reload) -------------------
+// Save index of currently open yellow-slot so reload re-opens it
+function getLastOpenSlotKey() {
+  return `${playerParam}LastOpenSlot_${gameId || 'default'}`;
+}
+
+function saveLastOpenSlot(slotIndex) {
+  try {
+    const key = getLastOpenSlotKey();
+    const payload = {
+      slotIndex: Number(slotIndex),
+      ts: Date.now()
+    };
+    localStorage.setItem(key, JSON.stringify(payload));
+    console.log(`✅ Saved last open slot ${slotIndex} -> ${key}`);
+  } catch (e) {
+    console.warn('⚠️ Failed to save last open slot:', e);
+  }
+}
+
+function readLastOpenSlot() {
+  try {
+    const key = getLastOpenSlotKey();
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const payload = JSON.parse(raw);
+    // Protection: ignore old entries > 30 minutes
+    if (payload && payload.ts && (Date.now() - payload.ts) > (30 * 60 * 1000)) {
+      // stale
+      localStorage.removeItem(key);
+      return null;
+    }
+    return (payload && Number.isFinite(payload.slotIndex)) ? payload.slotIndex : null;
+  } catch (e) {
+    console.warn('⚠️ Failed to read last open slot:', e);
+    return null;
+  }
+}
+
+function clearLastOpenSlot() {
+  try {
+    const key = getLastOpenSlotKey();
+    localStorage.removeItem(key);
+    console.log('✅ Cleared last open slot:', key);
+  } catch (e) {
+    console.warn('⚠️ Failed to clear last open slot:', e);
+  }
+}
+// -------------------------------------------------------------------------------------
+
 // ✅ حماية قوية من التكرار - علامات تتبع حالة التحميل
 let isLoadingPlayerCards = false;
 let isCardsRendered = false;
@@ -761,155 +811,6 @@ async function generateCardSlotsForPlayer() {
   return playerCardSlots;
 }
 
-// ✅ دالة مستقلة للتحقق من حالة modal وإعادة فتحها (حماية من الغش)
-async function checkAndReopenModal() {
-  console.log('🔍 بدء التحقق من حالة modal مفتوح...');
-  
-  if (!gameId || !cardSlots || cardSlots.length === 0) {
-    console.log('⚠️ لا يمكن التحقق من modal - gameId أو cardSlots غير متوفر');
-    return;
-  }
-  
-  const openModalKey = `${playerParam}OpenModal_${gameId}`;
-  let savedOpenModal = null;
-  let openModalData = null;
-  
-  // ✅ محاولة من localStorage أولاً
-  try {
-    savedOpenModal = localStorage.getItem(openModalKey);
-    if (savedOpenModal) {
-      openModalData = JSON.parse(savedOpenModal);
-      console.log(`✅ تم العثور على حالة modal في localStorage:`, openModalData);
-    }
-  } catch (e) {
-    console.warn('⚠️ خطأ في قراءة localStorage:', e);
-  }
-  
-  // ✅ إذا لم توجد في localStorage، جرب sessionStorage (يعمل بشكل أفضل على Render)
-  if (!openModalData) {
-    try {
-      savedOpenModal = sessionStorage.getItem(openModalKey);
-      if (savedOpenModal) {
-        openModalData = JSON.parse(savedOpenModal);
-        console.log(`✅ تم العثور على حالة modal في sessionStorage:`, openModalData);
-      }
-    } catch (e) {
-      console.warn('⚠️ خطأ في قراءة sessionStorage:', e);
-    }
-  }
-  
-  // ✅ إذا لم توجد في sessionStorage، جرب Firebase
-  if (!openModalData && gameId) {
-    try {
-      console.log('🔍 البحث عن حالة modal في Firebase...');
-      const gameData = await GameService.getGame(gameId);
-      const playerData = gameData[`player${player}`];
-      if (playerData && playerData.openModal) {
-        const firebaseModalData = playerData.openModal;
-        if (firebaseModalData.slotIndex !== undefined && firebaseModalData.slotIndex !== null) {
-          const slotIndex = firebaseModalData.slotIndex;
-          if (!isNaN(slotIndex) && slotIndex < cardSlots.length && slotIndex >= 0) {
-            openModalData = {
-              slotIndex: slotIndex,
-              slotCards: firebaseModalData.slotCards || cardSlots[slotIndex] || [],
-              timestamp: firebaseModalData.timestamp || Date.now()
-            };
-            console.log(`✅ تم العثور على حالة modal في Firebase:`, openModalData);
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('⚠️ خطأ في قراءة Firebase:', e);
-    }
-  }
-  
-  // ✅ إذا وجدت حالة modal، إعادة فتحها
-  if (openModalData) {
-    try {
-      const { slotIndex, slotCards: savedSlotCards } = openModalData;
-      
-      // ✅ التحقق من أن البيانات صحيحة
-      if (slotIndex === undefined || slotIndex === null || isNaN(slotIndex)) {
-        console.warn('⚠️ slotIndex غير صحيح في حالة modal:', slotIndex);
-        localStorage.removeItem(openModalKey);
-        sessionStorage.removeItem(openModalKey);
-        return;
-      }
-      
-      // ✅ التحقق من أن البطاقة لم يتم اختيارها بعد
-      const existingSelection = selectedCards.find(sc => sc.slotIndex === slotIndex);
-      if (!existingSelection && slotIndex < cardSlots.length && slotIndex >= 0) {
-        // ✅ إعادة فتح modal مع slotCards الصحيحة من cardSlots الحالية
-        const currentSlotCards = cardSlots[slotIndex] || [];
-        const finalSlotCards = (savedSlotCards && Array.isArray(savedSlotCards) && savedSlotCards.length > 0) 
-          ? savedSlotCards 
-          : currentSlotCards;
-        
-        if (finalSlotCards.length > 0) {
-          console.log(`🔄 إعادة فتح modal للبطاقة ${slotIndex + 1} بعد تحديث الصفحة (حماية من الغش)`);
-          console.log(`📋 slotCards:`, finalSlotCards);
-          
-          // ✅ استخدام محاولات متعددة لضمان العمل على Render
-          let attempts = 0;
-          const maxAttempts = 5;
-          
-          const tryOpenModal = () => {
-            attempts++;
-            console.log(`🔄 محاولة ${attempts}/${maxAttempts} لإعادة فتح modal...`);
-            
-            if (attempts <= maxAttempts) {
-              try {
-                // التحقق من أن الصفحة جاهزة
-                if (document.readyState === 'complete' && cardSlots && cardSlots.length > 0) {
-                  openCardSelectionModal(slotIndex, finalSlotCards);
-                  console.log(`✅ نجح فتح modal في المحاولة ${attempts}`);
-                } else {
-                  console.warn(`⚠️ الصفحة غير جاهزة بعد - المحاولة ${attempts}`);
-                  if (attempts < maxAttempts) {
-                    setTimeout(tryOpenModal, 500 * attempts);
-                  }
-                }
-              } catch (e) {
-                console.error(`❌ فشل فتح modal في المحاولة ${attempts}:`, e);
-                if (attempts < maxAttempts) {
-                  setTimeout(tryOpenModal, 500 * attempts);
-                }
-              }
-            }
-          };
-          
-          // محاولة أولى بعد 800ms
-          setTimeout(tryOpenModal, 800);
-          // محاولة ثانية بعد 2s
-          setTimeout(tryOpenModal, 2000);
-          // محاولة ثالثة بعد 3.5s
-          setTimeout(tryOpenModal, 3500);
-          // محاولة رابعة بعد 5s
-          setTimeout(tryOpenModal, 5000);
-          // محاولة خامسة بعد 7s
-          setTimeout(tryOpenModal, 7000);
-        } else {
-          // إذا لم توجد slotCards، حذف حالة modal
-          localStorage.removeItem(openModalKey);
-          sessionStorage.removeItem(openModalKey);
-          console.warn(`⚠️ لم يتم العثور على slotCards للبطاقة ${slotIndex + 1} - تم حذف حالة modal`);
-        }
-      } else {
-        // ✅ إذا تم اختيار البطاقة، حذف حالة modal
-        localStorage.removeItem(openModalKey);
-        sessionStorage.removeItem(openModalKey);
-        console.log(`✅ تم حذف حالة modal - البطاقة ${slotIndex + 1} تم اختيارها بالفعل`);
-      }
-    } catch (e) {
-      console.error('❌ خطأ في تحميل حالة modal مفتوح:', e);
-      localStorage.removeItem(openModalKey);
-      sessionStorage.removeItem(openModalKey);
-    }
-  } else {
-    console.log('ℹ️ لا توجد حالة modal مفتوح للتحقق منها');
-  }
-}
-
 /* ================== Load Game Data from Firebase ================== */
 async function loadGameData() {
   // ✅ حماية قوية من التكرار - التحقق من حالة التحميل
@@ -1248,11 +1149,35 @@ async function loadGameData() {
       // ✅ عرض الكروت المختارة مسبقاً في الشبكة
       renderCardSelectionGrid(cardSlots);
       
-      // ✅ حماية من الغش: إعادة فتح modal إذا كان مفتوحاً قبل تحديث الصفحة
-      // ✅ استدعاء دالة مستقلة للتحقق بعد تحميل الصفحة
-      setTimeout(() => {
-        checkAndReopenModal();
-      }, 1000);
+      // ✅ إذا ما زالت مرحلة الاختيار، أعد فتح البطاقة
+      if (isSelectionPhase && selectedCards.length < rounds) {
+        // read last open slot and reopen it
+        const lastOpen = readLastOpenSlot();
+        if (lastOpen !== null && Number.isFinite(lastOpen)) {
+          // حاول فتح نفس البطاقة كما قبل التحديث
+          try {
+            console.log(`🔁 Re-opening last open slot ${lastOpen} because selection incomplete`);
+            // انتظار قصير لضمان تحميل DOM
+            setTimeout(() => {
+              // البحث عن العنصر باستخدام data attribute أو الفهرس
+              const slotElements = document.querySelectorAll('.card-selection-slot');
+              if (slotElements[lastOpen]) {
+                // محاكاة النقر على البطاقة
+                slotElements[lastOpen].click();
+              } else {
+                // Fallback: محاولة فتح modal مباشرة
+                if (cardSlots[lastOpen] && Array.isArray(cardSlots[lastOpen])) {
+                  openCardSelectionModal(lastOpen, cardSlots[lastOpen]);
+                }
+              }
+            }, 500);
+          } catch (e) {
+            console.warn('⚠️ Failed to auto-open last slot on load:', e);
+          }
+        } else {
+          console.log('ℹ️ No last-open slot or it was stale/too-old.');
+        }
+      }
     } else if (picks.length > 0) {
       // إذا لم يكن في مرحلة الاختيار، عرض الكروت للترتيب
       console.log('✅ عرض الكروت للترتيب');
@@ -2618,7 +2543,11 @@ function renderCardSelectionGrid(slots) {
       wrapper.style.pointerEvents = 'none';
     } else {
       // ✅ السماح بالنقر فقط على البطاقات غير المختارة
-      wrapper.onclick = () => openCardSelectionModal(i, slot);
+      wrapper.onclick = () => {
+        // حفظ آخر بطاقة مفتوحة
+        saveLastOpenSlot(i);
+        openCardSelectionModal(i, slot);
+      };
     }
     
     wrapper.appendChild(numberDiv);
@@ -2680,51 +2609,6 @@ async function openCardSelectionModal(slotIndex, slotCards) {
   if (selectedCards.length >= rounds) {
     alert(`لقد اخترت بالفعل ${rounds} كرت. يرجى الضغط على "متابعة للترتيب"`);
     return;
-  }
-  
-  // ✅ حفظ حالة modal مفتوح (حماية من الغش - إذا قام بتحديث الصفحة)
-  // ✅ استخدام localStorage و sessionStorage و Firebase للضمان الكامل
-  if (gameId) {
-    const openModalKey = `${playerParam}OpenModal_${gameId}`;
-    const openModalData = {
-      slotIndex: slotIndex,
-      slotCards: slotCards,
-      timestamp: Date.now(),
-      gameId: gameId,
-      playerParam: playerParam
-    };
-    
-    // ✅ حفظ في localStorage
-    try {
-      localStorage.setItem(openModalKey, JSON.stringify(openModalData));
-      console.log(`✅ تم حفظ حالة modal مفتوح في localStorage للبطاقة ${slotIndex + 1}`);
-    } catch (e) {
-      console.warn('⚠️ خطأ في حفظ localStorage:', e);
-    }
-    
-    // ✅ حفظ في sessionStorage كنسخة احتياطية (يعمل بشكل أفضل على Render)
-    try {
-      sessionStorage.setItem(openModalKey, JSON.stringify(openModalData));
-      console.log(`✅ تم حفظ حالة modal مفتوح في sessionStorage للبطاقة ${slotIndex + 1}`);
-    } catch (e) {
-      console.warn('⚠️ خطأ في حفظ sessionStorage:', e);
-    }
-    
-    // ✅ حفظ في Firebase أيضاً (للضمان الكامل)
-    try {
-      const openModalData = {
-        slotIndex: slotIndex,
-        slotCards: slotCards,
-        timestamp: Date.now(),
-        gameId: gameId,
-        playerParam: playerParam
-      };
-      await GameService.savePlayerOpenModal(gameId, player, openModalData);
-      console.log(`✅ تم حفظ حالة modal مفتوح في Firebase للبطاقة ${slotIndex + 1}`);
-    } catch (e) {
-      console.warn('⚠️ خطأ في حفظ Firebase:', e);
-      // إذا فشل حفظ Firebase، نعتمد على localStorage و sessionStorage فقط
-    }
   }
   
   // ✅ استبعاد الكروت التي اختارها اللاعب الآخر من slotCards
@@ -2915,27 +2799,6 @@ async function openCardSelectionModal(slotIndex, slotCards) {
       localStorage.setItem(savedSelectedCardsKey, JSON.stringify(selectedCards));
       localStorage.setItem(`${playerParam}SelectedCards_GameId`, gameId);
       
-      // ✅ حذف حالة modal مفتوح (تم اختيار كرت) من جميع الأماكن
-      if (gameId) {
-        const openModalKey = `${playerParam}OpenModal_${gameId}`;
-        try {
-          localStorage.removeItem(openModalKey);
-          sessionStorage.removeItem(openModalKey);
-          
-          // ✅ حذف من Firebase أيضاً
-          try {
-            await GameService.savePlayerOpenModal(gameId, player, null);
-            console.log(`✅ تم حذف حالة modal من Firebase بعد اختيار كرت`);
-          } catch (e) {
-            console.warn('⚠️ خطأ في حذف حالة modal من Firebase:', e);
-          }
-          
-          console.log(`✅ تم حذف حالة modal مفتوح بعد اختيار كرت`);
-        } catch (e) {
-          console.warn('⚠️ خطأ في حذف حالة modal:', e);
-        }
-      }
-      
       // ✅ حفظ الكروت المختارة في Firebase مباشرة بعد الاختيار (لضمان استبعادها للاعب الآخر)
       if (gameId) {
         try {
@@ -2947,13 +2810,11 @@ async function openCardSelectionModal(slotIndex, slotCards) {
         }
       }
       
+      // ✅ تم الاختيار — لا نحتاج إعادة فتح popup بعد الآن
+      clearLastOpenSlot();
+      
       // ✅ حفظ حالة isSelectionPhase
       localStorage.setItem(`${playerParam}IsSelectionPhase_${gameId}`, JSON.stringify(isSelectionPhase));
-      
-      // ✅ إزالة beforeunload event listener
-      if (modal && modal._removeBeforeUnload) {
-        modal._removeBeforeUnload();
-      }
       
       // إغلاق modal
       document.body.removeChild(modal);
@@ -3005,31 +2866,8 @@ async function openCardSelectionModal(slotIndex, slotCards) {
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
   
-  // ✅ حماية من إغلاق المتصفح أو تغيير علامة التبويب أثناء فتح modal
-  const handleBeforeUnload = (e) => {
-    // التحقق من وجود modal مفتوح
-    if (document.body.contains(modal)) {
-      e.preventDefault();
-      e.returnValue = '⚠️ لديك modal اختيار كرت مفتوح. سيتم إعادة فتحه عند العودة.';
-      return e.returnValue;
-    }
-  };
-  
-  window.addEventListener('beforeunload', handleBeforeUnload);
-  
-  // ✅ إزالة event listener عند اختيار كرت أو إغلاق modal
-  const removeBeforeUnload = () => {
-    window.removeEventListener('beforeunload', handleBeforeUnload);
-  };
-  
-  // ✅ إضافة event listener لإزالة beforeunload عند اختيار كرت
-  // (سيتم إزالة handleBeforeUnload في cardOption.onclick)
-  
   // ✅ منع إغلاق modal عند النقر خارجها - يجب اختيار كرت
   // لا يوجد معالج onClick لـ modal - يجب اختيار كرت لإغلاق modal
-  
-  // ✅ حفظ مرجع removeBeforeUnload في modal للوصول إليه من cardOption.onclick
-  modal._removeBeforeUnload = removeBeforeUnload;
 }
 
 // إضافة أنيميشن CSS
@@ -4409,14 +4247,6 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         console.warn("⚠️ الدالة loadPlayerCards غير متوفرة حالياً.");
       }
-    }
-    
-    // ✅ التحقق من حالة modal بعد تحميل الصفحة مباشرة (حماية إضافية)
-    if (gameId && typeof checkAndReopenModal === 'function') {
-      setTimeout(() => {
-        console.log('🔍 التحقق من حالة modal بعد تحميل الصفحة (DOMContentLoaded)...');
-        checkAndReopenModal();
-      }, 2000);
     }
   } catch (e) {
     console.error("❌ خطأ أثناء إعادة تحميل ترتيب الكروت:", e);
