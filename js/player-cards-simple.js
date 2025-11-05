@@ -414,7 +414,7 @@ async function generateCardSlotsForPlayer() {
   
   console.log('🎴 توليد cardSlots للاعب...');
   
-  // ✅ جلب الكروت المستخدمة للاعب الآخر (إذا كانت موجودة) - فقط للعبة الحالية
+  // ✅ جلب الكروت المستخدمة للاعب الآخر (cardSlots + الكروت المختارة) - فقط للعبة الحالية
   let usedCardsByOpponent = [];
   if (gameId) {
     try {
@@ -428,20 +428,22 @@ async function generateCardSlotsForPlayer() {
       // محاولة جلب cardSlots من Firebase - فقط للعبة الحالية
       const gameData = await GameService.getGame(gameId);
       const otherPlayerData = gameData[`player${otherPlayer}`];
+      
+      // ✅ استخراج الكروت من cardSlots للاعب الآخر
       if (otherPlayerData && otherPlayerData.cardSlots && Array.isArray(otherPlayerData.cardSlots)) {
         // استخراج جميع الكروت من cardSlots للاعب الآخر باستخدام دالة الاستخراج
-        const opponentCards = getAllCardsFromSlots(otherPlayerData.cardSlots);
-        usedCardsByOpponent = opponentCards;
-        console.log(`✅ تم استبعاد ${usedCardsByOpponent.length} كرت مستخدمة للاعب الآخر من Firebase`);
+        const opponentCardSlotsCards = getAllCardsFromSlots(otherPlayerData.cardSlots);
+        usedCardsByOpponent.push(...opponentCardSlotsCards);
+        console.log(`✅ تم استبعاد ${opponentCardSlotsCards.length} كرت من cardSlots للاعب الآخر من Firebase`);
       } else if (otherPlayerCardSlotsGameId === gameId) {
         // ✅ محاولة من localStorage - فقط إذا كانت للعبة الحالية
         const otherPlayerCardSlots = localStorage.getItem(`${otherPlayerParam}CardSlots`);
         if (otherPlayerCardSlots) {
           try {
             const parsed = JSON.parse(otherPlayerCardSlots);
-            const opponentCards = getAllCardsFromSlots(parsed);
-            usedCardsByOpponent = opponentCards;
-            console.log(`✅ تم استبعاد ${usedCardsByOpponent.length} كرت مستخدمة للاعب الآخر من localStorage للعبة ${gameId}`);
+            const opponentCardSlotsCards = getAllCardsFromSlots(parsed);
+            usedCardsByOpponent.push(...opponentCardSlotsCards);
+            console.log(`✅ تم استبعاد ${opponentCardSlotsCards.length} كرت من cardSlots للاعب الآخر من localStorage للعبة ${gameId}`);
           } catch (e) {
             console.warn('⚠️ خطأ في تحميل cardSlots للاعب الآخر من localStorage');
           }
@@ -449,6 +451,55 @@ async function generateCardSlotsForPlayer() {
       } else {
         console.log(`ℹ️ تجاهل cardSlots للاعب الآخر - ليست للعبة الحالية (${otherPlayerCardSlotsGameId} != ${gameId})`);
       }
+      
+      // ✅ استخراج الكروت المختارة فعلياً من قبل اللاعب الآخر (picks أو selectedCards)
+      let opponentSelectedCards = [];
+      
+      // محاولة من Firebase (picks)
+      if (otherPlayerData && otherPlayerData.cards && Array.isArray(otherPlayerData.cards)) {
+        opponentSelectedCards = otherPlayerData.cards;
+        console.log(`✅ تم استبعاد ${opponentSelectedCards.length} كرت مختارة من قبل اللاعب الآخر من Firebase`);
+      }
+      
+      // محاولة من localStorage (selectedCards)
+      const otherPlayerSelectedCardsKey = `${otherPlayerParam}SelectedCards_${gameId}`;
+      const otherPlayerSelectedCardsGameId = localStorage.getItem(`${otherPlayerParam}SelectedCards_GameId`);
+      if (otherPlayerSelectedCardsGameId === gameId) {
+        const savedSelectedCards = localStorage.getItem(otherPlayerSelectedCardsKey);
+        if (savedSelectedCards) {
+          try {
+            const parsed = JSON.parse(savedSelectedCards);
+            // استخراج cardPath من selectedCards
+            const selectedCardPaths = parsed.map(sc => sc.cardPath || sc).filter(card => card);
+            opponentSelectedCards.push(...selectedCardPaths);
+            console.log(`✅ تم استبعاد ${selectedCardPaths.length} كرت مختارة من localStorage للاعب الآخر`);
+          } catch (e) {
+            console.warn('⚠️ خطأ في تحميل selectedCards للاعب الآخر من localStorage');
+          }
+        }
+      }
+      
+      // ✅ إضافة الكروت المختارة إلى القائمة المستبعدة
+      if (opponentSelectedCards.length > 0) {
+        // إزالة التكرارات
+        const uniqueOpponentSelectedCards = [...new Set(opponentSelectedCards)];
+        usedCardsByOpponent.push(...uniqueOpponentSelectedCards);
+        console.log(`✅ إجمالي الكروت المستبعدة: ${usedCardsByOpponent.length} (${usedCardsByOpponent.length - uniqueOpponentSelectedCards.length} من cardSlots + ${uniqueOpponentSelectedCards.length} مختارة)`);
+      }
+      
+      // ✅ إزالة التكرارات من القائمة النهائية
+      const normalizedUsed = usedCardsByOpponent.map(c => normalizeCardPath(c));
+      const uniqueUsed = [];
+      const seen = new Set();
+      usedCardsByOpponent.forEach((card, index) => {
+        const normalized = normalizedUsed[index];
+        if (normalized && !seen.has(normalized)) {
+          seen.add(normalized);
+          uniqueUsed.push(card);
+        }
+      });
+      usedCardsByOpponent = uniqueUsed;
+      
     } catch (e) {
       console.warn('⚠️ لم يتم العثور على كروت للاعب الآخر أو حدث خطأ:', e);
     }
@@ -2461,7 +2512,7 @@ function renderCardSelectionGrid(slots) {
 }
 
 // ✅ دالة لفتح modal اختيار الكرت (3 كروت لكل بطاقة)
-function openCardSelectionModal(slotIndex, slotCards) {
+async function openCardSelectionModal(slotIndex, slotCards) {
   // ✅ التحقق من أن البطاقة لم يتم اختيارها بالفعل - لا يمكن تغييرها
   const existingSelection = selectedCards.find(sc => sc.slotIndex === slotIndex);
   if (existingSelection) {
@@ -2474,6 +2525,74 @@ function openCardSelectionModal(slotIndex, slotCards) {
   if (selectedCards.length >= rounds) {
     alert(`لقد اخترت بالفعل ${rounds} كرت. يرجى الضغط على "متابعة للترتيب"`);
     return;
+  }
+  
+  // ✅ استبعاد الكروت التي اختارها اللاعب الآخر من slotCards
+  let availableSlotCards = [...slotCards];
+  if (gameId) {
+    try {
+      // تحديد اللاعب الآخر
+      const otherPlayer = player === "1" ? 2 : 1;
+      const otherPlayerParam = otherPlayer === 1 ? 'player1' : 'player2';
+      
+      // جلب الكروت المختارة من اللاعب الآخر
+      let opponentSelectedCards = [];
+      
+      // من Firebase
+      try {
+        const gameData = await GameService.getGame(gameId);
+        const otherPlayerData = gameData[`player${otherPlayer}`];
+        if (otherPlayerData && otherPlayerData.cards && Array.isArray(otherPlayerData.cards)) {
+          opponentSelectedCards = otherPlayerData.cards;
+        }
+      } catch (e) {
+        console.warn('⚠️ خطأ في جلب الكروت المختارة من Firebase:', e);
+      }
+      
+      // من localStorage
+      const otherPlayerSelectedCardsKey = `${otherPlayerParam}SelectedCards_${gameId}`;
+      const otherPlayerSelectedCardsGameId = localStorage.getItem(`${otherPlayerParam}SelectedCards_GameId`);
+      if (otherPlayerSelectedCardsGameId === gameId) {
+        const savedSelectedCards = localStorage.getItem(otherPlayerSelectedCardsKey);
+        if (savedSelectedCards) {
+          try {
+            const parsed = JSON.parse(savedSelectedCards);
+            const selectedCardPaths = parsed.map(sc => sc.cardPath || sc).filter(card => card);
+            opponentSelectedCards.push(...selectedCardPaths);
+          } catch (e) {
+            console.warn('⚠️ خطأ في تحميل selectedCards للاعب الآخر');
+          }
+        }
+      }
+      
+      // ✅ إزالة التكرارات من opponentSelectedCards
+      const uniqueOpponentSelectedCards = [...new Set(opponentSelectedCards)];
+      
+      // ✅ استبعاد الكروت المختارة من اللاعب الآخر من slotCards المتاحة
+      if (uniqueOpponentSelectedCards.length > 0) {
+        const normalizedOpponentCards = uniqueOpponentSelectedCards.map(c => normalizeCardPath(c));
+        availableSlotCards = slotCards.filter(card => {
+          const normalizedCard = normalizeCardPath(card);
+          return !normalizedOpponentCards.includes(normalizedCard);
+        });
+        
+        if (availableSlotCards.length < slotCards.length) {
+          const removedCount = slotCards.length - availableSlotCards.length;
+          console.log(`✅ تم استبعاد ${removedCount} كرت مختارة من اللاعب الآخر من slotCards`);
+        }
+      }
+      
+      // ✅ إذا لم تبق كروت متاحة، عرض رسالة خطأ
+      if (availableSlotCards.length === 0) {
+        alert('⚠️ جميع الكروت في هذه البطاقة تم اختيارها من قبل اللاعب الآخر. يرجى اختيار بطاقة أخرى.');
+        return;
+      }
+      
+    } catch (e) {
+      console.warn('⚠️ خطأ في استبعاد الكروت المختارة من اللاعب الآخر:', e);
+      // في حالة الخطأ، نستخدم slotCards الأصلية
+      availableSlotCards = slotCards;
+    }
   }
   
   // إنشاء modal احترافي
@@ -2526,8 +2645,33 @@ function openCardSelectionModal(slotIndex, slotCards) {
     margin-bottom: 20px;
   `;
   
-  // عرض 3 كروت
-  slotCards.forEach((cardPath, index) => {
+  // ✅ عرض الكروت المتاحة فقط (بعد استبعاد الكروت المختارة من اللاعب الآخر)
+  if (availableSlotCards.length === 0) {
+    // إذا لم تبق كروت متاحة، عرض رسالة
+    const message = document.createElement('div');
+    message.textContent = '⚠️ جميع الكروت في هذه البطاقة تم اختيارها من قبل اللاعب الآخر';
+    message.style.cssText = `
+      color: #ff6b6b;
+      text-align: center;
+      padding: 20px;
+      font-size: 18px;
+    `;
+    modalContent.appendChild(title);
+    modalContent.appendChild(message);
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+    
+    // إغلاق modal تلقائياً بعد 2 ثانية
+    setTimeout(() => {
+      if (document.body.contains(modal)) {
+        document.body.removeChild(modal);
+      }
+    }, 2000);
+    return;
+  }
+  
+  // ✅ عرض الكروت المتاحة فقط
+  availableSlotCards.forEach((cardPath, index) => {
     const cardOption = document.createElement('div');
     cardOption.className = 'card-option';
     cardOption.dataset.path = cardPath;
@@ -2570,6 +2714,17 @@ function openCardSelectionModal(slotIndex, slotCards) {
       const savedSelectedCardsKey = `${playerParam}SelectedCards_${gameId}`;
       localStorage.setItem(savedSelectedCardsKey, JSON.stringify(selectedCards));
       localStorage.setItem(`${playerParam}SelectedCards_GameId`, gameId);
+      
+      // ✅ حفظ الكروت المختارة في Firebase مباشرة بعد الاختيار (لضمان استبعادها للاعب الآخر)
+      if (gameId) {
+        try {
+          const selectedCardPaths = selectedCards.map(sc => sc.cardPath || sc).filter(card => card);
+          await GameService.savePlayerCards(gameId, player, selectedCardPaths);
+          console.log(`✅ تم حفظ ${selectedCardPaths.length} كرت مختارة في Firebase للاعب ${player}`);
+        } catch (e) {
+          console.warn('⚠️ خطأ في حفظ الكروت المختارة في Firebase:', e);
+        }
+      }
       
       // ✅ حفظ حالة isSelectionPhase
       localStorage.setItem(`${playerParam}IsSelectionPhase_${gameId}`, JSON.stringify(isSelectionPhase));
