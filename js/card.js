@@ -385,8 +385,17 @@ let voiceSystem = {
   // Set volume
   setVolume: function(volume) {
     this.volume = Math.max(0, Math.min(1, volume));
+    // ✅ تحديث الصوت الحالي في voiceSystem
     if (this.currentAudio) {
       this.currentAudio.volume = this.volume;
+    }
+    // ✅ تحديث الصوت النشط للبطاقة اليسرى (لاعب 2)
+    if (window.leftCurrentAudio) {
+      window.leftCurrentAudio.volume = this.volume;
+    }
+    // ✅ تحديث الصوت النشط للبطاقة اليمنى (لاعب 1)
+    if (window.rightCurrentAudio) {
+      window.rightCurrentAudio.volume = this.volume;
     }
   },
   
@@ -399,6 +408,16 @@ let voiceSystem = {
       if (this.currentAudio) {
         this.currentAudio.pause();
       }
+      // ✅ إيقاف الصوت النشط للبطاقة اليسرى
+      if (window.leftCurrentAudio) {
+        window.leftCurrentAudio.pause();
+        window.leftCurrentAudio.volume = 0;
+      }
+      // ✅ إيقاف الصوت النشط للبطاقة اليمنى
+      if (window.rightCurrentAudio) {
+        window.rightCurrentAudio.pause();
+        window.rightCurrentAudio.volume = 0;
+      }
       this.mutedVolume = this.volume; // Save current volume
       this.volume = 0;
     } else {
@@ -407,6 +426,20 @@ let voiceSystem = {
       if (this.currentAudio) {
         this.currentAudio.volume = this.volume;
         this.currentAudio.play().catch(e => console.log('Could not resume audio:', e));
+      }
+      // ✅ استعادة الصوت النشط للبطاقة اليسرى
+      if (window.leftCurrentAudio) {
+        window.leftCurrentAudio.volume = this.volume;
+        if (!window.leftCurrentAudio.ended) {
+          window.leftCurrentAudio.play().catch(e => console.log('Could not resume left audio:', e));
+        }
+      }
+      // ✅ استعادة الصوت النشط للبطاقة اليمنى
+      if (window.rightCurrentAudio) {
+        window.rightCurrentAudio.volume = this.volume;
+        if (!window.rightCurrentAudio.ended) {
+          window.rightCurrentAudio.play().catch(e => console.log('Could not resume right audio:', e));
+        }
       }
     }
     
@@ -934,6 +967,14 @@ let picks = loadPlayerPicks();
 
 let round = parseInt(localStorage.getItem("currentRound") || "0");
 
+// ✅ متغيرات لتتبع الصوت النشط الحالي لكل بطاقة
+let leftCurrentAudio = null;
+let rightCurrentAudio = null;
+
+// ✅ جعل المتغيرات متاحة عبر window للوصول إليها من voiceSystem
+window.leftCurrentAudio = leftCurrentAudio;
+window.rightCurrentAudio = rightCurrentAudio;
+
 // Scores init/persist with error handling
 let scores = {};
 try {
@@ -1248,35 +1289,25 @@ function renderVs(){
     rightName.textContent = player1;
   }
 
-  // Smooth card loading without clearing first
-  // ⬅️ الكرت الأيسر (لاعب 2)
-  if (leftCard) {
-    const leftCardSrc = picks?.[player2]?.[round];
-    if (leftCardSrc) {
-      const newMedia = createMedia(leftCardSrc, "");
-      leftCard.innerHTML = "";
-      leftCard.appendChild(newMedia);
-
-      // ✅ شغّل الصوت بالضبط عند بدء الفيديو أو عند عرض الصورة بالكامل
-      if (voiceSystem && voiceSystem.isLegendaryCard(leftCardSrc)) {
-        if (newMedia.tagName === "VIDEO") {
-          // عندما يبدأ الفيديو فعلياً بالعرض
-          newMedia.addEventListener("play", () => {
-            voiceSystem.playVoice(leftCardSrc, player2);
-          }, { once: true });
-        } else if (newMedia.tagName === "IMG") {
-          // عند اكتمال تحميل الصورة
-          newMedia.addEventListener("load", () => {
-            voiceSystem.playVoice(leftCardSrc, player2);
-          }, { once: true });
-        }
-      }
-    } else {
-      leftCard.innerHTML = '<div class="empty-hint">لا توجد بطاقة لهذه الجولة</div>';
-    }
+  // ✅ إيقاف أي صوت نشط من الجولة السابقة
+  if (leftCurrentAudio) {
+    leftCurrentAudio.pause();
+    leftCurrentAudio.currentTime = 0;
+    leftCurrentAudio = null;
+    window.leftCurrentAudio = null;
   }
+  if (rightCurrentAudio) {
+    rightCurrentAudio.pause();
+    rightCurrentAudio.currentTime = 0;
+    rightCurrentAudio = null;
+    window.rightCurrentAudio = null;
+  }
+
+  // Smooth card loading without clearing first
+  // ✅ نبدأ ببطاقة اللاعب الأول (الأيمن) ثم الثاني (الأيسر)
   
-  // ➡️ الكرت الأيمن (لاعب 1)
+  // ➡️ الكرت الأيمن (لاعب 1) - يبدأ أولاً
+  let rightCardHasVoice = false;
   if (rightCard) {
     const rightCardSrc = picks?.[player1]?.[round];
     if (rightCardSrc) {
@@ -1284,20 +1315,144 @@ function renderVs(){
       rightCard.innerHTML = "";
       rightCard.appendChild(newMedia);
 
-      // ✅ الصوت يبدأ فور بدء عرض الكرت فعلياً
+      // ✅ التحقق من أن البطاقة أسطورية
       if (voiceSystem && voiceSystem.isLegendaryCard(rightCardSrc)) {
+        rightCardHasVoice = true;
+        const voiceFileName = voiceSystem.getVoiceFileName(rightCardSrc);
+        const audioPath = `voice/${voiceFileName}.mp3`;
+
+        // ✅ 1. تهيئة الصوت مسبقاً حتى يكون جاهز فوراً
+        const preloadedAudio = new Audio(audioPath);
+        preloadedAudio.volume = voiceSystem.volume;
+        preloadedAudio.preload = "auto";
+        preloadedAudio.load();
+
+        // ✅ حفظ المرجع للصوت الحالي
+        rightCurrentAudio = preloadedAudio;
+        window.rightCurrentAudio = rightCurrentAudio;
+
+        // ✅ دالة لتشغيل الصوت
+        const playRightAudio = () => {
+          preloadedAudio.currentTime = 0;
+          preloadedAudio.play().catch(err => console.warn("⚠️ فشل تشغيل الصوت:", err));
+        };
+
+        // ✅ 2. شغّل الصوت لحظة بدء الفيديو تماماً
         if (newMedia.tagName === "VIDEO") {
-          newMedia.addEventListener("play", () => {
-            voiceSystem.playVoice(rightCardSrc, player1);
-          }, { once: true });
+          newMedia.addEventListener("playing", playRightAudio, { once: true });
         } else if (newMedia.tagName === "IMG") {
-          newMedia.addEventListener("load", () => {
-            voiceSystem.playVoice(rightCardSrc, player1);
-          }, { once: true });
+          // عند ظهور الصورة بشكل كامل
+          newMedia.addEventListener("load", playRightAudio, { once: true });
         }
+
+        // ✅ تنظيف المرجع عند انتهاء الصوت
+        preloadedAudio.addEventListener("ended", () => {
+          if (rightCurrentAudio === preloadedAudio) {
+            rightCurrentAudio = null;
+            window.rightCurrentAudio = null;
+          }
+          // ✅ عند انتهاء صوت اللاعب الأول، نبدأ صوت اللاعب الثاني إن وجد
+          if (leftCurrentAudio) {
+            // ✅ التأكد من أن الصوت الثاني جاهز ولم يبدأ بعد
+            if (leftCurrentAudio.readyState >= 2 && (leftCurrentAudio.paused || leftCurrentAudio.currentTime === 0)) {
+              leftCurrentAudio.currentTime = 0;
+              leftCurrentAudio.play().catch(err => console.warn("⚠️ فشل تشغيل الصوت الثاني:", err));
+            } else if (leftCurrentAudio.readyState < 2) {
+              // إذا لم يكن الصوت جاهزاً بعد، ننتظر حتى يصبح جاهزاً
+              leftCurrentAudio.addEventListener("canplay", () => {
+                if (leftCurrentAudio && (leftCurrentAudio.paused || leftCurrentAudio.currentTime === 0)) {
+                  leftCurrentAudio.currentTime = 0;
+                  leftCurrentAudio.play().catch(err => console.warn("⚠️ فشل تشغيل الصوت الثاني:", err));
+                }
+              }, { once: true });
+            }
+          }
+        }, { once: true });
       }
     } else {
       rightCard.innerHTML = '<div class="empty-hint">لا توجد بطاقة لهذه الجولة</div>';
+    }
+  }
+
+  // ⬅️ الكرت الأيسر (لاعب 2) - يبدأ بعد انتهاء الأول
+  if (leftCard) {
+    const leftCardSrc = picks?.[player2]?.[round];
+    if (leftCardSrc) {
+      const newMedia = createMedia(leftCardSrc, "");
+      leftCard.innerHTML = "";
+      leftCard.appendChild(newMedia);
+
+      // ✅ التحقق من أن البطاقة أسطورية
+      if (voiceSystem && voiceSystem.isLegendaryCard(leftCardSrc)) {
+        const voiceFileName = voiceSystem.getVoiceFileName(leftCardSrc);
+        const audioPath = `voice/${voiceFileName}.mp3`;
+
+        // ✅ 1. تهيئة الصوت مسبقاً حتى يكون جاهز فوراً
+        const preloadedAudio = new Audio(audioPath);
+        preloadedAudio.volume = voiceSystem.volume;
+        preloadedAudio.preload = "auto";
+        preloadedAudio.load();
+
+        // ✅ حفظ المرجع للصوت الحالي
+        leftCurrentAudio = preloadedAudio;
+        window.leftCurrentAudio = leftCurrentAudio;
+
+        // ✅ دالة لتشغيل الصوت الثاني
+        const playLeftAudio = () => {
+          // ✅ إذا كان الصوت الثاني يعمل بالفعل، لا نعيد تشغيله
+          if (preloadedAudio.currentTime > 0 && !preloadedAudio.paused && !preloadedAudio.ended) {
+            return;
+          }
+          
+          // ✅ إذا كان هناك صوت للاعب الأول ولا يزال يعمل، ننتظر حتى ينتهي
+          if (rightCardHasVoice && rightCurrentAudio && !rightCurrentAudio.ended) {
+            // الصوت الأول لا يزال يعمل، ننتظر حتى ينتهي (يتم تشغيله في حدث ended للصوت الأول)
+            return;
+          }
+          
+          // ✅ إذا لم يكن هناك صوت للاعب الأول أو انتهى، نبدأ مباشرة
+          if (preloadedAudio.readyState >= 2) { // HAVE_CURRENT_DATA أو أعلى
+            preloadedAudio.currentTime = 0;
+            preloadedAudio.play().catch(err => console.warn("⚠️ فشل تشغيل الصوت:", err));
+          } else {
+            // إذا لم يكن الصوت جاهزاً بعد، ننتظر قليلاً
+            preloadedAudio.addEventListener("canplay", () => {
+              if (preloadedAudio === leftCurrentAudio) { // التأكد من أن الصوت لم يتغير
+                preloadedAudio.currentTime = 0;
+                preloadedAudio.play().catch(err => console.warn("⚠️ فشل تشغيل الصوت:", err));
+              }
+            }, { once: true });
+          }
+        };
+
+        // ✅ 2. شغّل الصوت لحظة بدء الفيديو تماماً (أو بعد انتهاء الأول)
+        if (newMedia.tagName === "VIDEO") {
+          newMedia.addEventListener("playing", () => {
+            // نتحقق من حالة الصوت الأول بعد تأخير بسيط
+            setTimeout(() => {
+              playLeftAudio();
+            }, 100);
+          }, { once: true });
+        } else if (newMedia.tagName === "IMG") {
+          // عند ظهور الصورة بشكل كامل
+          newMedia.addEventListener("load", () => {
+            // نتحقق من حالة الصوت الأول بعد تأخير بسيط
+            setTimeout(() => {
+              playLeftAudio();
+            }, 100);
+          }, { once: true });
+        }
+
+        // ✅ تنظيف المرجع عند انتهاء الصوت
+        preloadedAudio.addEventListener("ended", () => {
+          if (leftCurrentAudio === preloadedAudio) {
+            leftCurrentAudio = null;
+            window.leftCurrentAudio = null;
+          }
+        }, { once: true });
+      }
+    } else {
+      leftCard.innerHTML = '<div class="empty-hint">لا توجد بطاقة لهذه الجولة</div>';
     }
   }
 
