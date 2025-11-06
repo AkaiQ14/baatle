@@ -1249,36 +1249,52 @@ function renderVs(){
   }
 
   // Smooth card loading without clearing first
+  // ⬅️ الكرت الأيسر (لاعب 2)
   if (leftCard) {
     const leftCardSrc = picks?.[player2]?.[round];
     if (leftCardSrc) {
-      // Create new media element
       const newMedia = createMedia(leftCardSrc, "");
-      // Replace content smoothly
       leftCard.innerHTML = "";
       leftCard.appendChild(newMedia);
-      
-      // Play voice for legendary card
+
+      // ✅ شغّل الصوت بالضبط عند بدء الفيديو أو عند عرض الصورة بالكامل
       if (voiceSystem && voiceSystem.isLegendaryCard(leftCardSrc)) {
-        voiceSystem.playVoice(leftCardSrc, player2);
+        if (newMedia.tagName === "VIDEO") {
+          // عندما يبدأ الفيديو فعلياً بالعرض
+          newMedia.addEventListener("play", () => {
+            voiceSystem.playVoice(leftCardSrc, player2);
+          }, { once: true });
+        } else if (newMedia.tagName === "IMG") {
+          // عند اكتمال تحميل الصورة
+          newMedia.addEventListener("load", () => {
+            voiceSystem.playVoice(leftCardSrc, player2);
+          }, { once: true });
+        }
       }
     } else {
       leftCard.innerHTML = '<div class="empty-hint">لا توجد بطاقة لهذه الجولة</div>';
     }
   }
   
+  // ➡️ الكرت الأيمن (لاعب 1)
   if (rightCard) {
     const rightCardSrc = picks?.[player1]?.[round];
     if (rightCardSrc) {
-      // Create new media element
       const newMedia = createMedia(rightCardSrc, "");
-      // Replace content smoothly
       rightCard.innerHTML = "";
       rightCard.appendChild(newMedia);
-      
-      // Play voice for legendary card
+
+      // ✅ الصوت يبدأ فور بدء عرض الكرت فعلياً
       if (voiceSystem && voiceSystem.isLegendaryCard(rightCardSrc)) {
-        voiceSystem.playVoice(rightCardSrc, player1);
+        if (newMedia.tagName === "VIDEO") {
+          newMedia.addEventListener("play", () => {
+            voiceSystem.playVoice(rightCardSrc, player1);
+          }, { once: true });
+        } else if (newMedia.tagName === "IMG") {
+          newMedia.addEventListener("load", () => {
+            voiceSystem.playVoice(rightCardSrc, player1);
+          }, { once: true });
+        }
       }
     } else {
       rightCard.innerHTML = '<div class="empty-hint">لا توجد بطاقة لهذه الجولة</div>';

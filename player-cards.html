@@ -12,17 +12,25 @@
     /* Card Grid Layout */
     #cardGrid {
       display: grid;
-      grid-template-columns: repeat(7, 1fr);
+      grid-template-columns: repeat(6, 1fr);
       grid-template-rows: auto auto;
       gap: 0.5rem;
-      max-width: 1200px;
+      max-width: 1235px;
       margin: 0 auto;
       place-items: center;
-      place-content: center;
+      justify-content: center;
+      justify-items: center;
+      direction: ltr; /* ✅ الأرقام تبدأ من اليسار */
     }
     
-    /* First row: 7 cards */
-    #cardGrid .card-wrapper:nth-child(-n+7) {
+    /* ✅ محاذاة البطاقات الصفراء في المنتصف */
+    #cardGrid:has(.card-selection-slot) {
+      justify-items: center;
+      justify-content: center;
+    }
+    
+    /* First row: 6 cards */
+    #cardGrid .card-wrapper:nth-child(-n+6) {
       grid-column: span 1;
       grid-row: 1;
     }
@@ -302,17 +310,66 @@
       content: '🏠';
       font-size: 18px;
     }
+    
+    /* ✅ أنماط البطاقات الصفراء - مطابقة تماماً لـ cards-setup.html */
+    .card-selection-slot {
+      width: 200px;
+      height: 80px;
+      background: #FFD700;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 700;
+      color: #000;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+      margin: 0;
+      border: none;
+    }
+    
+    .card-selection-slot:hover {
+      background: #d69a29;
+      transform: translateY(-2px) scale(1.05);
+      box-shadow: 0 6px 20px rgba(255, 165, 0, 0.5);
+    }
+    
+    .card-selection-slot.selected {
+      background: #b68410;
+      border: 2px solid #8B4513;
+      color: #000;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    @media (max-width: 768px) {
+      .card-selection-slot {
+        width: 80px;
+        height: 65px;
+        font-size: 20px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .card-selection-slot {
+        width: 70px;
+        height: 55px;
+        font-size: 18px;
+      }
+    }
   </style>
 </head>
 <body class="bg-[#4B0E1F] text-white p-6 min-h-screen flex flex-col items-center space-y-6" style="font-family: Cairo, sans-serif; background-image: url('images/QG14Background.png'); background-size: cover; background-repeat: no-repeat; background-attachment: fixed; background-position: center center; box-sizing: border-box; position: relative;">
   <p id="instruction" class="text-xl relative z-10 mb-8">اللاعب رتب بطاقاتك</p>
 
-  <div id="cardGrid" class="grid grid-cols-7 gap-4 w-full max-w-6xl mx-auto relative z-10">
+  <div id="cardGrid" class="w-full max-w-[1235px] mx-auto relative z-10">
     <!-- Cards will be populated here -->
   </div>
 
   <!-- Your abilities -->
-  <section id="abilitiesPanel" class="w-full max-w-6xl mx-auto mt-4 p-3 rounded bg-transparent border border-yellow-400 relative z-10">
+  <section id="abilitiesPanel" class="w-full max-w-[1235px] mx-auto mt-4 p-3 rounded bg-transparent border border-yellow-400 relative z-10">
     <p class="font-bold mb-2 text-center md:text-right">قدراتك (اضغط لطلب استخدامها):</p>
     <div id="playerAbilities" class="flex flex-wrap gap-2 justify-center md:justify-start">
       <!-- Abilities will be populated here -->
@@ -321,7 +378,7 @@
   </section>
 
   <!-- Opponent abilities (view-only) -->
-  <section id="opponentAbilitiesPanel" class="w-full max-w-6xl mx-auto mt-4 p-3 rounded bg-transparent border border-yellow-400 relative z-10 hidden">
+  <section id="opponentAbilitiesPanel" class="w-full max-w-[1235px] mx-auto mt-4 p-3 rounded bg-transparent border border-yellow-400 relative z-10 hidden">
     <p class="font-bold mb-2 text-center md:text-right">قدرات الخصم (عرض فقط):</p>
     <div id="opponentAbilities" class="flex flex-wrap gap-2 justify-center md:justify-start"></div>
   </section>

@@ -2607,6 +2607,7 @@ function renderCardSelectionGrid(slots) {
   grid.innerHTML = "";
   grid.style.opacity = '0.7';
   grid.style.transition = 'opacity 0.2s ease';
+  grid.style.direction = 'ltr'; // ✅ الأرقام تبدأ من اليسار
   
   // تحديث النص
   if (instruction) {
@@ -2626,43 +2627,13 @@ function renderCardSelectionGrid(slots) {
     
     const wrapper = document.createElement("div");
     wrapper.className = "card-selection-slot";
-    wrapper.style.cssText = `
-      width: 100px;
-      height: 140px;
-      background: linear-gradient(145deg, #FFD700, #FFA500);
-      border: 3px solid #FFFFFF;
-      border-radius: 12px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
-      position: relative;
-    `;
-    
-    // رقم البطاقة
-    const numberDiv = document.createElement("div");
-    numberDiv.textContent = i + 1;
-    numberDiv.style.cssText = `
-      font-size: 24px;
-      font-weight: bold;
-      color: #000;
-      margin-bottom: 5px;
-    `;
+    wrapper.textContent = i + 1; // ✅ رقم البطاقة مباشرة في العنصر (مثل cards-setup.html)
     
     // التحقق من اختيار البطاقة
     const isSelected = selectedCards.some(sc => sc.slotIndex === i);
     if (isSelected) {
-      wrapper.style.background = 'linear-gradient(145deg, #32c675, #28a745)';
-      wrapper.style.borderColor = '#10B981';
+      wrapper.classList.add('selected');
       wrapper.style.cursor = 'not-allowed';
-      wrapper.style.opacity = '0.9';
-      numberDiv.textContent = '✓';
-      numberDiv.style.color = '#FFF';
-      
-      // ✅ تعطيل النقر على البطاقات المختارة
       wrapper.onclick = null;
       wrapper.style.pointerEvents = 'none';
     } else {
@@ -2671,31 +2642,6 @@ function renderCardSelectionGrid(slots) {
         // حفظ آخر بطاقة مفتوحة
         saveLastOpenSlot(i);
         openCardSelectionModal(i, slot);
-      };
-    }
-    
-    wrapper.appendChild(numberDiv);
-    
-    // إضافة نص "اختر" أو "مختار"
-    const statusDiv = document.createElement("div");
-    statusDiv.textContent = isSelected ? 'مختار' : 'اختر';
-    statusDiv.style.cssText = `
-      font-size: 12px;
-      font-weight: bold;
-      color: ${isSelected ? '#FFF' : '#000'};
-      margin-top: 5px;
-    `;
-    wrapper.appendChild(statusDiv);
-    
-    // تأثير hover - فقط للبطاقات غير المختارة
-    if (!isSelected) {
-      wrapper.onmouseenter = () => {
-        wrapper.style.transform = 'scale(1.05)';
-        wrapper.style.boxShadow = '0 6px 20px rgba(255, 215, 0, 0.6)';
-      };
-      wrapper.onmouseleave = () => {
-        wrapper.style.transform = 'scale(1)';
-        wrapper.style.boxShadow = '0 4px 12px rgba(255, 215, 0, 0.4)';
       };
     }
     
@@ -3069,6 +3015,7 @@ function renderCards(pickList, lockedOrder = null) {
   // إضافة تأثير انتقال سلس لتقليل الوميض
   grid.style.opacity = '0.7';
   grid.style.transition = 'opacity 0.2s ease';
+  grid.style.direction = 'rtl'; // ✅ إعادة الاتجاه الأصلي عند عرض البطاقات المختارة
   
   // مسح المحتوى الحالي
   grid.innerHTML = "";
