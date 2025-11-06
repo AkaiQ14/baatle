@@ -1278,6 +1278,20 @@ function createMedia(url, className){
 
 /* ---------------------- VS section ---------------------- */
 
+// ✅ الخطوة 1: السماح بتشغيل الأصوات بعد أول تفاعل من المستخدم (Chrome Audio Policy)
+document.addEventListener("click", enableAudioPlaybackOnce, { once: true });
+document.addEventListener("keydown", enableAudioPlaybackOnce, { once: true });
+
+function enableAudioPlaybackOnce() {
+  try {
+    const dummy = new Audio();
+    dummy.muted = true;
+    dummy.play().then(() => {
+      console.log("🔊 Audio playback unlocked for Chrome");
+    }).catch(() => {});
+  } catch(e) {}
+}
+
 // ✅ نظام تهيئة الصوت مسبقًا لتفادي أي تأخير
 const preloadedVoices = {};
 
@@ -1290,7 +1304,6 @@ function preloadVoice(cardPath) {
   if (!preloadedVoices[audioPath]) {
     const audio = new Audio(audioPath);
     audio.preload = "auto";
-    audio.volume = voiceSystem.volume;
     audio.load();
     preloadedVoices[audioPath] = audio;
     console.log(`🎧 Preloaded voice: ${audioPath}`);
@@ -1356,25 +1369,22 @@ function renderVs(){
         const audio = preloadedVoices[audioPath];
         
         if (audio) {
-          // ✅ تحديث مستوى الصوت
+          audio.currentTime = 0;
           audio.volume = voiceSystem.volume;
           
           // ✅ حفظ المرجع للصوت الحالي
           rightCurrentAudio = audio;
           window.rightCurrentAudio = rightCurrentAudio;
 
-          // ✅ دالة لتشغيل الصوت
-          const playRightAudio = () => {
-            audio.currentTime = 0;
-            audio.play().catch(err => console.warn("⚠️ فشل تشغيل الصوت:", err));
-          };
-
-          // ✅ 2. شغّل الصوت لحظة بدء الفيديو تماماً
+          // ✅ الصوت يبدأ في نفس لحظة ظهور الكرت فعليًا
           if (newMedia.tagName === "VIDEO") {
-            newMedia.addEventListener("playing", playRightAudio, { once: true });
+            newMedia.addEventListener("playing", () => {
+              audio.play().catch(err => console.warn("⚠️ Audio play error:", err));
+            }, { once: true });
           } else if (newMedia.tagName === "IMG") {
-            // عند ظهور الصورة بشكل كامل
-            newMedia.addEventListener("load", playRightAudio, { once: true });
+            newMedia.addEventListener("load", () => {
+              audio.play().catch(err => console.warn("⚠️ Audio play error:", err));
+            }, { once: true });
           }
 
           // ✅ تنظيف المرجع عند انتهاء الصوت
@@ -1425,7 +1435,7 @@ function renderVs(){
         const audio = preloadedVoices[audioPath];
         
         if (audio) {
-          // ✅ تحديث مستوى الصوت
+          audio.currentTime = 0;
           audio.volume = voiceSystem.volume;
           
           // ✅ حفظ المرجع للصوت الحالي
@@ -1448,19 +1458,19 @@ function renderVs(){
             // ✅ إذا لم يكن هناك صوت للاعب الأول أو انتهى، نبدأ مباشرة
             if (audio.readyState >= 2) { // HAVE_CURRENT_DATA أو أعلى
               audio.currentTime = 0;
-              audio.play().catch(err => console.warn("⚠️ فشل تشغيل الصوت:", err));
+              audio.play().catch(err => console.warn("⚠️ Audio play error:", err));
             } else {
               // إذا لم يكن الصوت جاهزاً بعد، ننتظر قليلاً
               audio.addEventListener("canplay", () => {
                 if (audio === leftCurrentAudio) { // التأكد من أن الصوت لم يتغير
                   audio.currentTime = 0;
-                  audio.play().catch(err => console.warn("⚠️ فشل تشغيل الصوت:", err));
+                  audio.play().catch(err => console.warn("⚠️ Audio play error:", err));
                 }
               }, { once: true });
             }
           };
 
-          // ✅ 2. شغّل الصوت لحظة بدء الفيديو تماماً (أو بعد انتهاء الأول)
+          // ✅ الصوت يبدأ في نفس لحظة ظهور الكرت فعليًا (أو بعد انتهاء الأول)
           if (newMedia.tagName === "VIDEO") {
             newMedia.addEventListener("playing", () => {
               // نتحقق من حالة الصوت الأول بعد تأخير بسيط
@@ -1469,7 +1479,6 @@ function renderVs(){
               }, 100);
             }, { once: true });
           } else if (newMedia.tagName === "IMG") {
-            // عند ظهور الصورة بشكل كامل
             newMedia.addEventListener("load", () => {
               // نتحقق من حالة الصوت الأول بعد تأخير بسيط
               setTimeout(() => {
