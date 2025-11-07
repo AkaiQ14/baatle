@@ -33,7 +33,7 @@ let voiceSystem = {
       'aizen', 'AizenVoCrowCard', 'Akai', 'AllForOne', 'Ayanokoji', 'Ranppo', 'Todo', 'ZenoSama',
       // Removed: 'Asta', 
       'Beru', 'Cell', 'Sasuke', 'Vermoth', 'Ouki', 'Kakashi', 'Rukia', 'Akame', 'Sukuna',
-      'Dio', 'ErenCard', 'foboki', 'Gin', 'Giyuu', 'Gogeta', 'Gohan Beast', 'Gojo', 'Yami', 'Vegeta',
+      'Dio', 'ErenCard', 'foboki', 'Gin', 'Giyuu', 'Gogeta', 'Gohan Beast', 'Gojo', 'Yami', 'vegeta',
       // Removed: 'Goku UI', 
       'Hashirama', 'Hawks', 'Hinata', 'Hisoka', 'jiraya', 'Riboku', 'Lelouch', 'Utsuro', 'Kyurak', 'Shinobu',
       // Changed: 'joker' to 'Joker'
@@ -97,7 +97,7 @@ let voiceSystem = {
       'Itachi': 'Itachi',
       'jiraya': 'jiraya',
       'Yami': 'Yami',
-      'Vegeta': 'Vegeta',
+      'vegeta': 'vegeta',
       // Changed: 'joker': 'joker' to 'Joker': 'Joker'
       'Joker': 'Joker',
       'Kaido': 'Kaido',
