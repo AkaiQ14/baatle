@@ -1272,6 +1272,17 @@ async function loadGameData() {
     // ✅ حفظ القدرات في localStorage للتحميل السريع في المستقبل
     const abilitiesKey = `${playerParam}Abilities`;
     localStorage.setItem(abilitiesKey, JSON.stringify(myAbilities));
+    
+    // ✅ حفظ القدرات في Firebase فوراً (للمزامنة الفورية على جميع الأجهزة)
+    if (database && myAbilities.length > 0) {
+      const abilitiesRef = ref(database, `games/${gameId}/players/${playerParam}/abilities`);
+      set(abilitiesRef, myAbilities).then(() => {
+        console.log(`✅ تم حفظ القدرات في Firebase للاعب ${playerParam} (${myAbilities.length} قدرة)`);
+      }).catch((error) => {
+        console.error('❌ خطأ في حفظ القدرات في Firebase:', error);
+      });
+    }
+    
     console.log(`✅ تم حفظ البطاقات والقدرات للعبة ${gameId}`, {
       cards: picks.length,
       abilities: myAbilities.length
@@ -1446,6 +1457,17 @@ function updateGameData(gameData) {
     localStorage.setItem(abilitiesKey, JSON.stringify(myAbilities));
     console.log(`✅ تم حفظ القدرات المحدثة في localStorage`, myAbilities.length);
     
+    // ✅ حفظ القدرات في Firebase فوراً (للمزامنة الفورية على جميع الأجهزة)
+    if (database && myAbilities.length > 0) {
+      const currentGameId = localStorage.getItem('currentGameId') || gameId || 'default-game';
+      const abilitiesRef = ref(database, `games/${currentGameId}/players/${playerParam}/abilities`);
+      set(abilitiesRef, myAbilities).then(() => {
+        console.log(`✅ تم حفظ القدرات في Firebase للاعب ${playerParam} (من updateGameData)`);
+      }).catch((error) => {
+        console.error('❌ خطأ في حفظ القدرات في Firebase:', error);
+      });
+    }
+    
     renderAbilities(myAbilities);
   }
   
@@ -1481,6 +1503,17 @@ function renderAbilities(abilities) {
   
   // Normalize abilities to the correct format
   const normalizedAbilities = normalizeAbilityList(abilities);
+  
+  // ✅ حفظ القدرات في Firebase فوراً (للمزامنة الفورية على جميع الأجهزة)
+  if (database && normalizedAbilities.length > 0) {
+    const currentGameId = localStorage.getItem('currentGameId') || gameId || 'default-game';
+    const abilitiesRef = ref(database, `games/${currentGameId}/players/${playerParam}/abilities`);
+    set(abilitiesRef, normalizedAbilities).then(() => {
+      console.log(`✅ تم حفظ القدرات في Firebase للاعب ${playerParam} (من renderAbilities)`);
+    }).catch((error) => {
+      console.error('❌ خطأ في حفظ القدرات في Firebase:', error);
+    });
+  }
   
   // Use renderBadges for consistent UI
   renderBadges(abilitiesWrap, normalizedAbilities, { 
@@ -2010,11 +2043,13 @@ function startUsedAbilitiesListener() {
           localStorage.setItem(abilitiesKey, JSON.stringify(updatedAbilities));
           console.log('✅ تم تحديث abilities في localStorage:', updatedAbilities.length, 'قدرة');
           
-          // ✅ تحديث الواجهة
+          // ✅ تحديث الواجهة فوراً (مهم للهواتف)
           if (abilitiesWrap) {
             console.log('🎨 إعادة رسم الواجهة...');
+            // ✅ مسح الواجهة أولاً للتحديث الفوري
+            abilitiesWrap.innerHTML = '';
             renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
-            console.log('✅ تم إعادة رسم الواجهة');
+            console.log('✅ تم إعادة رسم الواجهة (فوري)');
           } else {
             console.warn('⚠️ abilitiesWrap غير موجود - لا يمكن تحديث الواجهة');
           }
@@ -2103,9 +2138,12 @@ function startUsedAbilitiesListener() {
       });
       localStorage.setItem(abilitiesKey, JSON.stringify(updatedAbilities));
 
-      // ✅ تحديث الواجهة
+      // ✅ تحديث الواجهة فوراً (مهم للهواتف)
       if (abilitiesWrap) {
+        // ✅ مسح الواجهة أولاً للتحديث الفوري
+        abilitiesWrap.innerHTML = '';
         renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+        console.log('✅ تم إعادة رسم الواجهة (onChildRemoved - فوري)');
       }
 
       if (abilityStatus) {
