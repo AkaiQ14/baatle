@@ -713,8 +713,8 @@ async function generateCardSlotsForPlayer() {
   const totalSlots = 20;
   const playerCardSlots = [];
   
-  // ✅ منع التكرار داخل اللاعب نفسه
-  const globalUsed = new Set();
+  // ✅ منع التكرار داخل اللاعب نفسه - استخدام Set لتتبع الكروت المستخدمة بشكل فريد
+  const globalUsedSet = new Set();
   
   // ✅ دالة للحصول على كرت عشوائي بشكل عادل (استخدام crypto.getRandomValues)
   const getRandomCard = (availableCards) => {
@@ -726,13 +726,20 @@ async function generateCardSlotsForPlayer() {
     return availableCards[randomIndex];
   };
   
-  // ✅ دالة لإنشاء مجموعة من 3 كروت فريدة مع توزيع عادل
-  const createSlot = (usedCards, slotIndex, availableCardsPool) => {
+  // ✅ دالة لإنشاء مجموعة من 3 كروت فريدة مع توزيع عادل - منع التكرار تماماً
+  const createSlot = (slotIndex, availableCardsPool) => {
     const slotCards = [];
-    const availableForSlot = availableCardsPool.filter(card => 
-      !usedCards.includes(card) &&
-      !globalUsed.has(normalizeCardPath(card))
-    );
+    
+    // ✅ فلترة الكروت المتاحة - استبعاد الكروت المستخدمة بالفعل (باستخدام normalizeCardPath)
+    const availableForSlot = availableCardsPool.filter(card => {
+      const normalized = normalizeCardPath(card);
+      return normalized && !globalUsedSet.has(normalized);
+    });
+    
+    if (availableForSlot.length === 0) {
+      console.warn(`⚠️ لا توجد كروت متاحة للسلوط ${slotIndex}`);
+      return slotCards;
+    }
     
     // ✅ توزيع عادل: محاولة الحصول على مزيج من common و epic لكل بطاقة
     const availableCommonForSlot = availableForSlot.filter(card => availableCommon.includes(card));
@@ -757,33 +764,37 @@ async function generateCardSlotsForPlayer() {
         randomCard = getRandomCard(availableForSlot);
       }
       
-      if (randomCard && !slotCards.includes(randomCard)) {
-        slotCards.push(randomCard);
-        globalUsed.add(normalizeCardPath(randomCard));
-        // إزالة الكرت من القائمة المتاحة لهذا السلوط
-        const index = availableForSlot.indexOf(randomCard);
-        if (index > -1) {
-          availableForSlot.splice(index, 1);
-        }
-        // إزالة من قائمة epic/common إذا كان موجوداً
-        const epicIndex = availableEpicForSlot.indexOf(randomCard);
-        if (epicIndex > -1) {
-          availableEpicForSlot.splice(epicIndex, 1);
-        }
-        const commonIndex = availableCommonForSlot.indexOf(randomCard);
-        if (commonIndex > -1) {
-          availableCommonForSlot.splice(commonIndex, 1);
-        }
-      } else {
-        // إذا لم نجد كرت متاح، نختار من القائمة المتبقية
-        if (availableForSlot.length > 0) {
-          randomCard = availableForSlot[0];
-          if (!slotCards.includes(randomCard)) {
-            slotCards.push(randomCard);
-            globalUsed.add(normalizeCardPath(randomCard));
-            availableForSlot.splice(0, 1);
+      if (randomCard) {
+        const normalized = normalizeCardPath(randomCard);
+        
+        // ✅ التحقق من عدم التكرار - يجب أن يكون الكرت فريداً تماماً
+        if (normalized && !globalUsedSet.has(normalized) && !slotCards.includes(randomCard)) {
+          slotCards.push(randomCard);
+          // ✅ إضافة الكرت إلى Set المستخدمة لمنع التكرار تماماً
+          globalUsedSet.add(normalized);
+          
+          // إزالة الكرت من القائمة المتاحة لهذا السلوط
+          const index = availableForSlot.indexOf(randomCard);
+          if (index > -1) {
+            availableForSlot.splice(index, 1);
+          }
+          // إزالة من قائمة epic/common إذا كان موجوداً
+          const epicIndex = availableEpicForSlot.indexOf(randomCard);
+          if (epicIndex > -1) {
+            availableEpicForSlot.splice(epicIndex, 1);
+          }
+          const commonIndex = availableCommonForSlot.indexOf(randomCard);
+          if (commonIndex > -1) {
+            availableCommonForSlot.splice(commonIndex, 1);
+          }
+        } else {
+          // إذا كان الكرت مستخدماً بالفعل، نزيله من القائمة المتاحة
+          const index = availableForSlot.indexOf(randomCard);
+          if (index > -1) {
+            availableForSlot.splice(index, 1);
           }
         }
+      } else {
         break; // لا توجد كروت متاحة
       }
     }
@@ -791,43 +802,73 @@ async function generateCardSlotsForPlayer() {
     return slotCards;
   };
   
-  // ✅ توليد 20 بطاقة صفراء مع 3 كروت لكل بطاقة - توزيع عادل
-  const allUsedCards = [];
-  
+  // ✅ توليد 20 بطاقة صفراء مع 3 كروت لكل بطاقة - توزيع عادل ومنع التكرار تماماً
   // ✅ خلط الكروت مرة أخرى قبل التوزيع على البطاقات لضمان العدالة
   const shuffledForDistribution = fairShuffle(allAvailableCards);
   
   for (let i = 0; i < totalSlots; i++) {
-    const slotCards = createSlot(allUsedCards, i, shuffledForDistribution);
+    const slotCards = createSlot(i, shuffledForDistribution);
     
     if (slotCards.length === 3) {
       // ✅ خلط الكروت داخل البطاقة الواحدة لضمان التنوع
       const shuffledSlotCards = fairShuffle(slotCards);
       playerCardSlots.push(shuffledSlotCards);
-      allUsedCards.push(...shuffledSlotCards);
+    } else if (slotCards.length > 0) {
+      // ✅ إذا كان هناك كروت أقل من 3، نستخدم ما هو متاح
+      const shuffledSlotCards = fairShuffle(slotCards);
+      playerCardSlots.push(shuffledSlotCards);
+      console.warn(`⚠️ السلوط ${i} يحتوي على ${slotCards.length} كروت فقط بدلاً من 3`);
     } else {
-      // إذا لم نتمكن من الحصول على 3 كروت فريدة، نستخدم كروت متاحة
-      const remainingCards = shuffledForDistribution.filter(card => !allUsedCards.includes(card));
-      while (slotCards.length < 3 && remainingCards.length > 0) {
-        const randomCard = getRandomCard(remainingCards);
-        if (randomCard && !slotCards.includes(randomCard)) {
-          slotCards.push(randomCard);
-          globalUsed.add(normalizeCardPath(randomCard));
-          allUsedCards.push(randomCard);
-          const index = remainingCards.indexOf(randomCard);
-          if (index > -1) {
-            remainingCards.splice(index, 1);
+      // ✅ إذا لم نجد أي كروت، نستخدم كروت متاحة من القائمة المتبقية
+      const remainingCards = shuffledForDistribution.filter(card => {
+        const normalized = normalizeCardPath(card);
+        return normalized && !globalUsedSet.has(normalized);
+      });
+      
+      if (remainingCards.length > 0) {
+        const fallbackCards = [];
+        while (fallbackCards.length < 3 && remainingCards.length > 0) {
+          const randomCard = getRandomCard(remainingCards);
+          if (randomCard) {
+            const normalized = normalizeCardPath(randomCard);
+            if (normalized && !globalUsedSet.has(normalized)) {
+              fallbackCards.push(randomCard);
+              globalUsedSet.add(normalized);
+              const index = remainingCards.indexOf(randomCard);
+              if (index > -1) {
+                remainingCards.splice(index, 1);
+              }
+            } else {
+              const index = remainingCards.indexOf(randomCard);
+              if (index > -1) {
+                remainingCards.splice(index, 1);
+              }
+            }
+          } else {
+            break;
           }
-        } else {
-          break;
+        }
+        
+        if (fallbackCards.length > 0) {
+          const shuffledFallbackCards = fairShuffle(fallbackCards);
+          playerCardSlots.push(shuffledFallbackCards);
+          console.warn(`⚠️ السلوط ${i} يستخدم كروت احتياطية: ${fallbackCards.length} كروت`);
         }
       }
-      // ✅ خلط الكروت داخل البطاقة حتى لو كانت أقل من 3
-      if (slotCards.length > 0) {
-        const shuffledSlotCards = fairShuffle(slotCards);
-        playerCardSlots.push(shuffledSlotCards);
-      }
     }
+  }
+  
+  // ✅ التحقق من عدم التكرار - فحص نهائي
+  const allCardsInSlots = playerCardSlots.flat();
+  const normalizedAllCards = allCardsInSlots.map(card => normalizeCardPath(card));
+  const uniqueNormalized = new Set(normalizedAllCards);
+  
+  if (normalizedAllCards.length !== uniqueNormalized.size) {
+    console.error(`❌ تم اكتشاف تكرار في الكروت! إجمالي: ${normalizedAllCards.length}, فريدة: ${uniqueNormalized.size}`);
+    const duplicates = normalizedAllCards.filter((card, index) => normalizedAllCards.indexOf(card) !== index);
+    console.error('❌ الكروت المكررة:', duplicates);
+  } else {
+    console.log(`✅ تم التحقق: جميع الكروت الـ ${normalizedAllCards.length} فريدة تماماً`);
   }
   
   console.log('✅ تم توليد cardSlots:', {
