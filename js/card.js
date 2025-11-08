@@ -1998,6 +1998,39 @@ function renderPanels(){
       renderAbilitiesPanel(P2_ABILITIES_KEY, player2Container, player2, player1);
     }
     
+    // ✅ حفظ القدرات في Firebase بعد العرض (لضمان المزامنة)
+    if (database) {
+      const gameId = localStorage.getItem('currentGameId') || 'default-game';
+      
+      try {
+        // تحميل القدرات الحالية
+        const player1Abilities = loadPlayerAbilities('player1');
+        const player2Abilities = loadPlayerAbilities('player2');
+        
+        // حفظ قدرات اللاعب 1 في Firebase
+        if (player1Abilities.length > 0) {
+          const player1AbilitiesRef = ref(database, `games/${gameId}/players/player1/abilities`);
+          set(player1AbilitiesRef, player1Abilities).then(() => {
+            console.log('✅ تم حفظ قدرات اللاعب 1 في Firebase (من renderPanels)');
+          }).catch((error) => {
+            console.error('❌ خطأ في حفظ قدرات اللاعب 1 في Firebase:', error);
+          });
+        }
+        
+        // حفظ قدرات اللاعب 2 في Firebase
+        if (player2Abilities.length > 0) {
+          const player2AbilitiesRef = ref(database, `games/${gameId}/players/player2/abilities`);
+          set(player2AbilitiesRef, player2Abilities).then(() => {
+            console.log('✅ تم حفظ قدرات اللاعب 2 في Firebase (من renderPanels)');
+          }).catch((error) => {
+            console.error('❌ خطأ في حفظ قدرات اللاعب 2 في Firebase:', error);
+          });
+        }
+      } catch (error) {
+        console.error('❌ خطأ في حفظ القدرات في Firebase:', error);
+      }
+    }
+    
     // ✅ لا نعيد تحميل الملاحظات عند تحديث القدرات - تبقى كما هي
     // updateNotesForRound(); // تم إزالة هذا السطر
     
@@ -3285,6 +3318,35 @@ function initializeGameData() {
     localStorage.setItem(P1_ABILITIES_KEY, JSON.stringify(player1Abilities));
     localStorage.setItem(P2_ABILITIES_KEY, JSON.stringify(player2Abilities));
     
+    // ✅ حفظ القدرات في Firebase Realtime Database
+    if (database) {
+      const gameId = localStorage.getItem('currentGameId') || 'default-game';
+      
+      try {
+        // حفظ قدرات اللاعب 1
+        if (player1Abilities.length > 0) {
+          const player1AbilitiesRef = ref(database, `games/${gameId}/players/player1/abilities`);
+          set(player1AbilitiesRef, player1Abilities).then(() => {
+            console.log('✅ تم حفظ قدرات اللاعب 1 في Firebase');
+          }).catch((error) => {
+            console.error('❌ خطأ في حفظ قدرات اللاعب 1 في Firebase:', error);
+          });
+        }
+        
+        // حفظ قدرات اللاعب 2
+        if (player2Abilities.length > 0) {
+          const player2AbilitiesRef = ref(database, `games/${gameId}/players/player2/abilities`);
+          set(player2AbilitiesRef, player2Abilities).then(() => {
+            console.log('✅ تم حفظ قدرات اللاعب 2 في Firebase');
+          }).catch((error) => {
+            console.error('❌ خطأ في حفظ قدرات اللاعب 2 في Firebase:', error);
+          });
+        }
+      } catch (error) {
+        console.error('❌ خطأ في حفظ القدرات في Firebase:', error);
+      }
+    }
+    
     console.log('Abilities loaded from new system:', {
       player1: player1Abilities,
       player2: player2Abilities
@@ -3303,6 +3365,31 @@ function initializeGameData() {
       
       localStorage.setItem(P1_ABILITIES_KEY, JSON.stringify(player1Abilities));
       localStorage.setItem(P2_ABILITIES_KEY, JSON.stringify(player2Abilities));
+      
+      // ✅ حفظ القدرات في Firebase Realtime Database
+      if (database) {
+        const gameId = localStorage.getItem('currentGameId') || 'default-game';
+        
+        try {
+          // حفظ قدرات اللاعب 1
+          const player1AbilitiesRef = ref(database, `games/${gameId}/players/player1/abilities`);
+          set(player1AbilitiesRef, player1Abilities).then(() => {
+            console.log('✅ تم حفظ قدرات اللاعب 1 في Firebase (من gameSetupProgress)');
+          }).catch((error) => {
+            console.error('❌ خطأ في حفظ قدرات اللاعب 1 في Firebase:', error);
+          });
+          
+          // حفظ قدرات اللاعب 2
+          const player2AbilitiesRef = ref(database, `games/${gameId}/players/player2/abilities`);
+          set(player2AbilitiesRef, player2Abilities).then(() => {
+            console.log('✅ تم حفظ قدرات اللاعب 2 في Firebase (من gameSetupProgress)');
+          }).catch((error) => {
+            console.error('❌ خطأ في حفظ قدرات اللاعب 2 في Firebase:', error);
+          });
+        } catch (error) {
+          console.error('❌ خطأ في حفظ القدرات في Firebase:', error);
+        }
+      }
       
       console.log('Loaded abilities from gameSetupProgress:', {
         player1: gameSetupProgress.player1.abilities,

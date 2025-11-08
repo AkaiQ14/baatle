@@ -2139,6 +2139,59 @@ function startAbilitiesListener() {
 
     console.log('✅ بدء الاستماع لتغييرات abilities من Firebase:', refPath);
 
+    // ✅ تحميل القدرات من Firebase عند البدء
+    get(abilitiesRef).then((snapshot) => {
+      const firebaseAbilities = snapshot.val() || [];
+      
+      // ✅ التأكد من أن firebaseAbilities مصفوفة
+      let abilitiesArray = [];
+      if (Array.isArray(firebaseAbilities)) {
+        abilitiesArray = firebaseAbilities;
+      } else if (typeof firebaseAbilities === 'object') {
+        // إذا كان كائن، حوله إلى مصفوفة
+        abilitiesArray = Object.values(firebaseAbilities);
+      }
+      
+      if (abilitiesArray.length > 0) {
+        console.log('📥 تحميل القدرات الأولية من Firebase:', abilitiesArray.length, 'قدرة');
+        
+        // ✅ تحديث myAbilities مع الحفاظ على حالة used من usedAbilities
+        const usedAbilitiesKey = `${playerParam}UsedAbilities`;
+        const usedAbilities = JSON.parse(localStorage.getItem(usedAbilitiesKey) || '[]');
+        const usedSet = new Set(usedAbilities);
+        
+        // ✅ تحديث myAbilities مع دمج حالة used
+        myAbilities = abilitiesArray.map(ability => {
+          const text = typeof ability === 'string' ? ability : (ability.text || ability);
+          const isUsed = usedSet.has(text) || (typeof ability === 'object' && ability.used === true);
+          return {
+            text: text,
+            used: isUsed
+          };
+        });
+        
+        // ✅ حفظ في localStorage
+        const abilitiesKey = `${playerParam}Abilities`;
+        localStorage.setItem(abilitiesKey, JSON.stringify(myAbilities));
+        
+        // ✅ تحديث الواجهة
+        if (abilitiesWrap) {
+          renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+          console.log('✅ تم تحديث واجهة القدرات من Firebase (التحميل الأولي)');
+        }
+        
+        console.log(`✅ تم تحميل ${myAbilities.length} قدرة للاعب ${playerParam} من Firebase`);
+      } else {
+        console.log('⚠️ لا توجد قدرات في Firebase للاعب', playerParam, '- سيتم استخدام localStorage');
+        // إذا لم توجد في Firebase، جرب localStorage
+        loadPlayerAbilities();
+      }
+    }).catch((error) => {
+      console.error('❌ خطأ في تحميل القدرات الأولية من Firebase:', error);
+      // إذا فشل التحميل من Firebase، جرب localStorage
+      loadPlayerAbilities();
+    });
+
     // ✅ الاستماع لتغييرات abilities باستخدام onValue
     onValue(abilitiesRef, (snapshot) => {
       const firebaseAbilities = snapshot.val() || [];
@@ -2150,6 +2203,12 @@ function startAbilitiesListener() {
       } else if (typeof firebaseAbilities === 'object') {
         // إذا كان كائن، حوله إلى مصفوفة
         abilitiesArray = Object.values(firebaseAbilities);
+      }
+      
+      // ✅ تجاهل إذا كانت القدرات فارغة (قد يكون هذا التحديث الأولي)
+      if (abilitiesArray.length === 0) {
+        console.log('⚠️ القدرات فارغة في Firebase - تجاهل التحديث');
+        return;
       }
       
       console.log('📥 تحديث القدرات من Firebase:', abilitiesArray.length, 'قدرة');
