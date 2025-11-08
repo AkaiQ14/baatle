@@ -1,7 +1,8 @@
 // Import Firebase GameService
 import { GameService } from './gameService.js';
-import { auth } from './firebase-init.js';
+import { auth, database } from './firebase-init.js';
 import syncService from './sync-service.js';
+import { ref, onChildChanged, onChildRemoved, onValue, get, set } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
 
 // ========== حماية من التداخل بين اللاعبين ==========
 // تم إضافة حماية لمنع إعادة تعيين ترتيب اللاعب الآخر عند تأكيد ترتيب أحد اللاعبين
@@ -106,6 +107,11 @@ if (gameId) {
   syncService.initSync(gameId).then(success => {
     if (success) {
       console.log(`✅ Firebase sync initialized for gameId:`, gameId);
+      // ✅ بدء الاستماع لنتائج طلبات القدرات من Firebase
+      startPlayerAbilityResultListener();
+      
+      // ✅ بدء الاستماع لتغييرات usedAbilities من Firebase (لإعادة تفعيل القدرات)
+      startUsedAbilitiesListener();
     } else {
       console.warn('⚠️ Firebase sync failed to initialize, using localStorage only');
     }
@@ -222,17 +228,17 @@ let isSelectionPhase = true; // هل نحن في مرحلة الاختيار أ�
 // Initialize card manager
 let cardManager = null;
 
-// Socket.IO initialization
-const socket = io();
-const gameID = gameId || 'default-game';
-const playerRole = playerParam;
+// Socket.IO initialization - REMOVED/DISABLED
+// const socket = io();
+// const gameID = gameId || 'default-game';
+// const playerRole = playerParam;
 
-// Check if socket is initialized
-if (!socket) {
-  console.error('Socket not initialized');
-}
+// Check if socket is initialized - REMOVED/DISABLED
+// if (!socket) {
+//   console.error('Socket not initialized');
+// }
 
-socket.emit("joinGame", { gameID, role: playerRole, playerName: playerName });
+// socket.emit("joinGame", { gameID, role: playerRole, playerName: playerName });
 
 // ===== Ability state =====
 let myAbilities = [];                 // authoritative list for this player (objects: {text, used})
@@ -999,10 +1005,15 @@ async function loadGameData() {
                 continue; // يعيد المحاولة
               }
               
-              // ✅ لا توجد تكرارات - حفظ في Firebase
+              // ✅ لا توجد تكرارات - حفظ في Firebase Realtime Database
               try {
-                await GameService.savePlayerCardSlots(gameId, player, cardSlots);
-                console.log('✅ تم حفظ cardSlots في Firebase بدون تكرار');
+                if (database && gameId) {
+                  const cardSlotsRef = ref(database, `games/${gameId}/players/${player}/cardSlots`);
+                  await set(cardSlotsRef, cardSlots);
+                  console.log('✅ تم حفظ cardSlots في Firebase Realtime Database بدون تكرار');
+                } else {
+                  console.warn('⚠️ Firebase database أو gameId غير متاح - سيتم حفظ cardSlots في localStorage فقط');
+                }
                 break; // نجح الحفظ - خروج من الحلقة
               } catch (e) {
                 console.error('❌ فشل حفظ cardSlots في Firebase:', e);
@@ -1036,8 +1047,13 @@ async function loadGameData() {
           console.error(`❌ فشل توليد كروت بدون تكرار بعد ${maxAttempts} محاولات - سيتم حفظ الكروت الحالية مع تحذير`);
           if (cardSlots && cardSlots.length > 0 && gameId) {
             try {
-              await GameService.savePlayerCardSlots(gameId, player, cardSlots);
-              console.log('⚠️ تم حفظ cardSlots مع تحذير بوجود تكرارات محتملة');
+              if (database && gameId) {
+                const cardSlotsRef = ref(database, `games/${gameId}/players/${player}/cardSlots`);
+                await set(cardSlotsRef, cardSlots);
+                console.log('⚠️ تم حفظ cardSlots في Firebase Realtime Database مع تحذير بوجود تكرارات محتملة');
+              } else {
+                console.warn('⚠️ Firebase database أو gameId غير متاح - سيتم حفظ cardSlots في localStorage فقط');
+              }
             } catch (e) {
               console.error('❌ فشل حفظ cardSlots في Firebase:', e);
             }
@@ -1654,63 +1670,39 @@ function loadPlayerCards() {
 
 /* ================== Abilities (self) ================== */
 
-// ✅ إزالة القدرات الافتراضية - تحميل القدرات الحقيقية فقط من localStorage/Firebase
 if (abilityStatus) {
   abilityStatus.textContent = "جاري تحميل القدرات...";
 }
 
-// ✅ لا توجد قدرات افتراضية - سيتم التحميل من loadPlayerAbilities() فقط
 myAbilities = [];
-console.log('✅ No default abilities - Will load real abilities from localStorage/Firebase');
+console.log('✅ No default abilities - Will load real abilities from Firebase');
 
-// Request abilities from server (if using socket)
-if (socket) {
-  socket.emit("requestAbilities", { gameID, playerName });
-  console.log('Requested abilities from server');
-}
+// ✅ إزالة كل استخدام للـ socket
+// لم نعد نستعمل:
+// socket.emit("requestAbilities") أو socket.on("receiveAbilities")
+
+// لذا الآن abilities سيتم تحميلها فقط من:
+// loadPlayerAbilities() و Firebase syncService
 
 /* ================== Opponent abilities (view-only) ================== */
-if (socket) {
-  socket.emit("getPlayers", { gameID });
-  socket.on("players", (names = []) => {
-    const two = Array.isArray(names) ? names : [];
-    const opponent = two.find(n => n && n !== playerName) || null;
-    if (opponent) socket.emit("requestAbilities", { gameID, playerName: opponent });
-  });
-}
 
-// Abilities router
-if (socket) {
-  socket.on("receiveAbilities", ({ abilities, player }) => {
-    console.log('Received abilities:', { abilities, player, playerName });
-    const list = normalizeAbilityList(abilities);
-    if (player === playerName || !player) {
-      myAbilities = list.map(a => ({ ...a, used: a.used || tempUsed.has(a.text) }));
-      console.log('Setting myAbilities:', myAbilities);
-      if (abilitiesWrap) {
-        renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
-      }
-      if (abilityStatus) {
-        abilityStatus.textContent = myAbilities.length
-          ? "اضغط على القدرة لطلب استخدامها. سيتم إشعار المستضيف."
-          : "لا توجد قدرات متاحة حالياً.";
-      }
-      return;
-    }
-    if (submittedOrder && submittedOrder.length === picks.length) { 
-      hideOpponentPanel(); 
-      return; 
-    }
-    if (oppWrap) {
-      renderBadges(oppWrap, list, { clickable: false });
-    }
-  });
-}
+// ✅ حذف نظام جلب الخصم عبر socket
+// لن نحتاج requestAbilities أو getPlayers
+
+// سيتم بدلاً من ذلك استعمال نظامك الموجود: loadOpponentAbilities()
+
+/* ================== Handling abilities after cards load ================== */
+
+// بعد تحميل الكروت، النظام سيستدعي:
+// loadPlayerAbilities();
+// loadOpponentAbilities();
+
+/* ================== Abilities Request Logic (Firebase Only) ================== */
 
 async function requestUseAbility(abilityText) {
   console.log('🎯 Requesting ability:', abilityText);
   
-  // ✅ التحقق من وجود طلب pending بالفعل لهذه القدرة
+  // check existing pending request
   try {
     const existingRequests = JSON.parse(localStorage.getItem('abilityRequests') || '[]');
     const hasPendingRequest = existingRequests.some(req => 
@@ -1734,15 +1726,19 @@ async function requestUseAbility(abilityText) {
   if (abilityStatus) {
     abilityStatus.textContent = "⏳ تم إرسال طلب استخدام القدرة…";
   }
+
   const requestId = `${playerParam}_${abilityText}_${Date.now()}`;
+
+  // visual update
   tempUsed.add(abilityText);
   pendingRequests.set(requestId, abilityText);
   myAbilities = (myAbilities || []).map(a => a.text === abilityText ? { ...a, used: true } : a);
+
   if (abilitiesWrap) {
     renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
   }
   
-  // Create request object
+  // ✅ إرسال الطلب إلى Firebase فقط
   const newRequest = {
     id: requestId,
     requestId: requestId,
@@ -1752,120 +1748,313 @@ async function requestUseAbility(abilityText) {
     status: 'pending',
     timestamp: Date.now()
   };
-  
-  console.log('✅ إنشاء طلب جديد:', requestId);
-  
-  // ✅ PRIMARY: إضافة إلى Firebase (يعمل عبر جميع الأجهزة)
+
   try {
-    if (syncService.isReady()) {
-      const result = await syncService.addAbilityRequest(newRequest);
-      if (result) {
-        console.log('✅ Ability request added to Firebase (cross-device):', result);
-        
-        if (abilityStatus) {
-          abilityStatus.textContent = "⏳ في انتظار موافقة المستضيف...";
-          abilityStatus.style.color = "#f59e0b";
-        }
-        
-        return; // نجح Firebase، لا حاجة للمتابعة
-      }
-    }
-  } catch (error) {
-    console.error('⚠️ Firebase error, falling back to localStorage:', error);
-  }
-  
-  // ✅ FALLBACK: localStorage (للتوافق مع الأنظمة القديمة أو إذا فشل Firebase)
-  try {
-    const abilityRequests = JSON.parse(localStorage.getItem('abilityRequests') || '[]');
-    
-    // Check if request already exists
-    const existingIndex = abilityRequests.findIndex(req => 
-      req.playerParam === playerParam && req.abilityText === abilityText && req.status === 'pending'
-    );
-    
-    if (existingIndex === -1) {
-      // Add new request
-      abilityRequests.push(newRequest);
-      localStorage.setItem('abilityRequests', JSON.stringify(abilityRequests));
-      
-      console.log('✅ Ability request added to localStorage (fallback):', newRequest);
-      
-      // Trigger events
-      window.dispatchEvent(new StorageEvent('storage', {
-        key: 'abilityRequests',
-        newValue: localStorage.getItem('abilityRequests'),
-        oldValue: localStorage.getItem('abilityRequests'),
-        storageArea: localStorage
-      }));
-      
-      window.dispatchEvent(new CustomEvent('abilityRequestAdded', {
-        detail: newRequest
-      }));
-      
-      if (abilityStatus) {
-        abilityStatus.textContent = "⏳ في انتظار موافقة المستضيف...";
-        abilityStatus.style.color = "#f59e0b";
-      }
-      
+    if (syncService?.isReady?.()) {
+      await syncService.addAbilityRequest(newRequest);
     } else {
-      console.log('⚠️ Request already exists for this ability');
-      if (abilityStatus) {
-        abilityStatus.textContent = "⏳ الطلب قيد المراجعة بالفعل...";
-      }
+      // fallback local
+      const list = JSON.parse(localStorage.getItem('abilityRequests') || '[]');
+      list.push(newRequest);
+      localStorage.setItem('abilityRequests', JSON.stringify(list));
     }
-    
-  } catch (error) {
-    console.error('❌ Error adding ability request:', error);
-    
-    // Reset the ability state if everything fails
+  } catch (err) {
+    console.error("Failed to send ability request:", err);
+
+    // rollback
     tempUsed.delete(abilityText);
     pendingRequests.delete(requestId);
-    myAbilities = (myAbilities || []).map(a => a.text === abilityText ? { ...a, used: false } : a);
-    if (abilitiesWrap) {
-      renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
-    }
-    if (abilityStatus) {
-      abilityStatus.textContent = "❌ تعذر إرسال الطلب. حاول مرة أخرى.";
-      abilityStatus.style.color = "#dc2626";
-    }
-  }
-  
-  // ⚠️ ALSO send via socket if available (TERTIARY METHOD for backward compatibility)
-  if (socket) {
-    socket.emit("requestUseAbility", { gameID, playerName, abilityText, requestId });
-    console.log('📡 Ability request sent via socket (backup):', { gameID, playerName, abilityText, requestId });
+    myAbilities = myAbilities.map(a => a.text === abilityText ? { ...a, used: false } : a);
+
+    renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+    if (abilityStatus) abilityStatus.textContent = "❌ حدث خطأ أثناء إرسال الطلب";
   }
 }
 
-if (socket) {
-  socket.on("abilityRequestResult", ({ requestId, ok, reason }) => {
-    const abilityText = pendingRequests.get(requestId);
-    if (abilityText) pendingRequests.delete(requestId);
+/**
+ * بدء الاستماع لنتائج طلبات القدرات من Firebase Realtime Database
+ * يستبدل socket.on("abilityRequestResult")
+ */
+function startPlayerAbilityResultListener() {
+  if (!database || !gameId) {
+    console.warn('⚠️ Firebase database أو gameId غير موجودين - لن يتم تشغيل مستمع نتائج طلبات القدرات');
+    return;
+  }
 
-    if (!ok) {
-      if (abilityText) {
-        tempUsed.delete(abilityText);
-        myAbilities = (myAbilities || []).map(a => a.text === abilityText ? { ...a, used: false } : a);
+  try {
+    const refPath = `games/${gameId}/abilityRequests`;
+    const requestsRef = ref(database, refPath);
+
+    console.log('✅ بدء الاستماع لنتائج طلبات القدرات من Firebase:', refPath);
+
+    // عندما يتغير أي طلب، تحقق إذا كان يخص هذا playerParam
+    onChildChanged(requestsRef, (snapshot) => {
+      const req = snapshot.val();
+      if (!req) return;
+
+      // فقط طلبات هذا اللاعب
+      if (req.playerParam !== playerParam) return;
+
+      const requestKey = snapshot.key;
+      const requestId = req.requestId || req.id || requestKey;
+      const abilityText = req.abilityText || req.ability;
+
+      console.log('🔄 تحديث طلب قدرة من Firebase:', { requestKey, requestId, abilityText, status: req.status });
+
+      // إزالة من pendingRequests
+      if (pendingRequests.has(requestId)) {
+        pendingRequests.delete(requestId);
       }
+
+      if (req.status === 'accepted' || req.status === 'approved') {
+        // بالفعل تم قبول — أبقِ العلامة "used" ظاهرة في الواجهة
+        // (هي موجودة أساساً لأننا وضعنا myAbilities.used = true عند الطلب)
+        if (abilityStatus) {
+          abilityStatus.textContent = "✅ تم قبول الطلب من المستضيف.";
+          abilityStatus.style.color = "#1a9c35";
+        }
+
+        // احفظ حالة الاستخدام في localStorage إذا تريد
+        // يمكن إضافة منطق إضافي هنا إذا لزم الأمر
+
+      } else if (req.status === 'rejected') {
+        // تراجع عن التغيرات المؤقتة
+        if (abilityText) {
+          tempUsed.delete(abilityText);
+          myAbilities = (myAbilities || []).map(a => a.text === abilityText ? { ...a, used: false } : a);
+        }
+        
+        if (abilitiesWrap) {
+          renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+        }
+
+        if (abilityStatus) {
+          abilityStatus.textContent = "❌ تم رفض الطلب.";
+          abilityStatus.style.color = "#dc2626";
+        }
+      }
+    });
+
+    console.log('✅ مستمع نتائج طلبات القدرات من Firebase نشط');
+  } catch (error) {
+    console.error('❌ خطأ في بدء مستمع نتائج طلبات القدرات من Firebase:', error);
+  }
+}
+
+// ✅ متغير خارجي لتتبع القدرات المستخدمة السابقة
+let previousUsedAbilitiesSet = new Set();
+
+// ✅ مستمع لتغييرات usedAbilities من Firebase (لإعادة تفعيل القدرات)
+function startUsedAbilitiesListener() {
+  if (!database || !gameId || !playerParam) {
+    console.warn('⚠️ Firebase database أو gameId أو playerParam غير موجودين - لن يتم تشغيل مستمع usedAbilities');
+    return;
+  }
+
+  try {
+    const refPath = `games/${gameId}/players/${playerParam}/usedAbilities`;
+    const usedAbilitiesRef = ref(database, refPath);
+
+    console.log('✅ بدء الاستماع لتغييرات usedAbilities من Firebase:', refPath);
+
+    // ✅ تهيئة previousUsedAbilitiesSet من Firebase عند البدء
+    get(usedAbilitiesRef).then((snapshot) => {
+      const initialUsedAbilities = snapshot.val() || {};
+      previousUsedAbilitiesSet = new Set();
+      Object.keys(initialUsedAbilities).forEach(abilityKey => {
+        const abilityData = initialUsedAbilities[abilityKey];
+        const abilityText = abilityData?.text || decodeURIComponent(abilityKey);
+        previousUsedAbilitiesSet.add(abilityText);
+      });
+      console.log('✅ تم تهيئة previousUsedAbilitiesSet:', Array.from(previousUsedAbilitiesSet));
+    }).catch((error) => {
+      console.error('❌ خطأ في تهيئة previousUsedAbilitiesSet:', error);
+    });
+    
+    // ✅ الاستماع لتغييرات usedAbilities باستخدام onValue (أكثر موثوقية)
+    onValue(usedAbilitiesRef, (snapshot) => {
+      const currentUsedAbilities = snapshot.val() || {};
+      const currentSet = new Set();
+      
+      // ✅ بناء مجموعة القدرات المستخدمة الحالية
+      Object.keys(currentUsedAbilities).forEach(abilityKey => {
+        const abilityData = currentUsedAbilities[abilityKey];
+        const abilityText = abilityData?.text || decodeURIComponent(abilityKey);
+        currentSet.add(abilityText);
+      });
+      
+      // ✅ العثور على القدرات التي تم حذفها (إعادة تفعيلها)
+      previousUsedAbilitiesSet.forEach(abilityText => {
+        if (!currentSet.has(abilityText)) {
+          // ✅ هذه القدرة تم حذفها (إعادة تفعيلها)
+          console.log('🔄 تم إعادة تفعيل القدرة من Firebase:', abilityText);
+          
+          // ✅ إزالة من tempUsed
+          tempUsed.delete(abilityText);
+          
+          // ✅ تحديث myAbilities
+          myAbilities = (myAbilities || []).map(a => {
+            const text = a.text || a;
+            if (text === abilityText) {
+              return { ...a, used: false };
+            }
+            return a;
+          });
+          
+          // ✅ تحديث localStorage
+          const usedAbilitiesKey = `${playerParam}UsedAbilities`;
+          let usedAbilities = JSON.parse(localStorage.getItem(usedAbilitiesKey) || '[]');
+          usedAbilities = usedAbilities.filter(ability => ability !== abilityText);
+          localStorage.setItem(usedAbilitiesKey, JSON.stringify(usedAbilities));
+          
+          // ✅ تحديث القدرات في localStorage
+          const abilitiesKey = `${playerParam}Abilities`;
+          let abilities = JSON.parse(localStorage.getItem(abilitiesKey) || '[]');
+          const updatedAbilities = abilities.map(ability => {
+            const text = typeof ability === 'string' ? ability : (ability.text || ability);
+            if (text === abilityText) {
+              return typeof ability === 'string' ? { text: ability, used: false } : { ...ability, used: false };
+            }
+            return typeof ability === 'string' ? { text: ability, used: ability.used || false } : ability;
+          });
+          localStorage.setItem(abilitiesKey, JSON.stringify(updatedAbilities));
+          
+          // ✅ تحديث الواجهة
+          if (abilitiesWrap) {
+            renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+          }
+          
+          if (abilityStatus) {
+            abilityStatus.textContent = `🔄 تم إعادة تفعيل القدرة: ${abilityText}`;
+            abilityStatus.style.color = "#1a9c35";
+            setTimeout(() => {
+              if (abilityStatus) {
+                abilityStatus.textContent = "";
+              }
+            }, 3000);
+          }
+          
+          console.log(`✅ تم إعادة تفعيل القدرة للاعب ${playerParam}:`, abilityText);
+        }
+      });
+      
+      // ✅ تحديث previousUsedAbilitiesSet للمقارنة التالية
+      previousUsedAbilitiesSet = currentSet;
+    }, (error) => {
+      console.error('❌ خطأ في مستمع usedAbilities:', error);
+    });
+    
+    // ✅ أيضاً الاستماع لحذف القدرات المستخدمة (عند إعادة تفعيلها من قبل المضيف)
+    onChildRemoved(usedAbilitiesRef, (snapshot) => {
+      const abilityData = snapshot.val();
+      const abilityKey = snapshot.key;
+      
+      // ✅ استخراج abilityText من abilityData أو من abilityKey
+      let abilityText = null;
+      if (abilityData && abilityData.text) {
+        abilityText = abilityData.text;
+      } else if (abilityKey) {
+        // إذا لم يكن هناك abilityData، فاستخدم abilityKey (المشفر)
+        try {
+          abilityText = decodeURIComponent(abilityKey);
+        } catch (e) {
+          // إذا فشل فك التشفير، استخدم abilityKey كما هو
+          abilityText = abilityKey;
+        }
+      }
+      
+      if (!abilityText) {
+        console.warn('⚠️ لم يتم العثور على abilityText في snapshot:', { abilityData, abilityKey });
+        return;
+      }
+      
+      console.log('🔄 تم إعادة تفعيل القدرة من Firebase (onChildRemoved):', abilityText);
+
+      // ✅ إزالة من tempUsed
+      tempUsed.delete(abilityText);
+
+      // ✅ تحديث myAbilities
+      myAbilities = (myAbilities || []).map(a => {
+        const text = a.text || a;
+        if (text === abilityText) {
+          return { ...a, used: false };
+        }
+        return a;
+      });
+
+      // ✅ تحديث localStorage
+      const usedAbilitiesKey = `${playerParam}UsedAbilities`;
+      let usedAbilities = JSON.parse(localStorage.getItem(usedAbilitiesKey) || '[]');
+      usedAbilities = usedAbilities.filter(ability => ability !== abilityText);
+      localStorage.setItem(usedAbilitiesKey, JSON.stringify(usedAbilities));
+
+      // ✅ تحديث القدرات في localStorage
+      const abilitiesKey = `${playerParam}Abilities`;
+      let abilities = JSON.parse(localStorage.getItem(abilitiesKey) || '[]');
+      const updatedAbilities = abilities.map(ability => {
+        const text = typeof ability === 'string' ? ability : (ability.text || ability);
+        if (text === abilityText) {
+          return typeof ability === 'string' ? { text: ability, used: false } : { ...ability, used: false };
+        }
+        return typeof ability === 'string' ? { text: ability, used: ability.used || false } : ability;
+      });
+      localStorage.setItem(abilitiesKey, JSON.stringify(updatedAbilities));
+
+      // ✅ تحديث الواجهة
       if (abilitiesWrap) {
         renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
       }
-      if (socket) {
-        socket.emit("requestAbilities", { gameID, playerName });
-      }
 
       if (abilityStatus) {
-        if (reason === "already_used") abilityStatus.textContent = "❌ القدرة تم استخدامها بالفعل. اطلب قدرة أخرى.";
-        else if (reason === "ability_not_found") abilityStatus.textContent = "❌ القدرة غير معروفة لدى المستضيف.";
-        else abilityStatus.textContent = "❌ تعذر تنفيذ الطلب.";
+        abilityStatus.textContent = `🔄 تم إعادة تفعيل القدرة: ${abilityText}`;
+        abilityStatus.style.color = "#1a9c35";
+        setTimeout(() => {
+          if (abilityStatus) {
+            abilityStatus.textContent = "";
+          }
+        }, 3000);
       }
-    } else {
-      if (abilityStatus) {
-        abilityStatus.textContent = "✅ تم قبول الطلب من المستضيف.";
-      }
-    }
-  });
+
+      console.log(`✅ تم إعادة تفعيل القدرة للاعب ${playerParam}:`, abilityText);
+    });
+
+    console.log('✅ مستمع usedAbilities من Firebase نشط');
+  } catch (error) {
+    console.error('❌ خطأ في بدء مستمع usedAbilities من Firebase:', error);
+  }
 }
+
+// ⚠️ socket.on تم استبداله بمستمع Firebase
+// المستمع الجديد startPlayerAbilityResultListener يتولى كل شيء من Firebase
+// if (socket) {
+//   socket.on("abilityRequestResult", ({ requestId, ok, reason }) => {
+//     const abilityText = pendingRequests.get(requestId);
+//     if (abilityText) pendingRequests.delete(requestId);
+//
+//     if (!ok) {
+//       if (abilityText) {
+//         tempUsed.delete(abilityText);
+//         myAbilities = (myAbilities || []).map(a => a.text === abilityText ? { ...a, used: false } : a);
+//       }
+//       if (abilitiesWrap) {
+//         renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+//       }
+//       if (socket) {
+//         socket.emit("requestAbilities", { gameID, playerName });
+//       }
+//
+//       if (abilityStatus) {
+//         if (reason === "already_used") abilityStatus.textContent = "❌ القدرة تم استخدامها بالفعل. اطلب قدرة أخرى.";
+//         else if (reason === "ability_not_found") abilityStatus.textContent = "❌ القدرة غير معروفة لدى المستضيف.";
+//         else abilityStatus.textContent = "❌ تعذر تنفيذ الطلب.";
+//       }
+//     } else {
+//       if (abilityStatus) {
+//         abilityStatus.textContent = "✅ تم قبول الطلب من المستضيف.";
+//       }
+//     }
+//   });
+// }
 
 // Load abilities from localStorage
 function loadPlayerAbilities() {
@@ -1876,8 +2065,23 @@ function loadPlayerAbilities() {
   
   if (savedAbilities) {
     try {
-      const abilities = JSON.parse(savedAbilities);
-      console.log('Parsed abilities:', abilities);
+      const abilitiesRaw = JSON.parse(savedAbilities);
+      console.log('Parsed abilities:', abilitiesRaw);
+      
+      // تأكد أن abilities هو مصفوفة وليس كائن
+      let abilities = [];
+      if (Array.isArray(abilitiesRaw)) {
+        abilities = abilitiesRaw;
+      } else if (typeof abilitiesRaw === 'object' && abilitiesRaw !== null) {
+        // إذا كان كائن، حوله إلى مصفوفة من القيم
+        abilities = Object.values(abilitiesRaw);
+      } else if (typeof abilitiesRaw === 'string') {
+        // إذا كان نص، حوله إلى مصفوفة
+        abilities = [abilitiesRaw];
+      } else {
+        console.warn('Unexpected abilities format:', abilitiesRaw);
+        abilities = [];
+      }
       
       // Always reset abilities to unused state for new game
       // Only check for used abilities if we're in the middle of a game
@@ -1886,7 +2090,43 @@ function loadPlayerAbilities() {
       
       // Always load used abilities (both from game and from host control)
       const usedAbilitiesKey = `${playerParam}UsedAbilities`;
-      const usedAbilities = JSON.parse(localStorage.getItem(usedAbilitiesKey) || '[]');
+      const usedAbilitiesRaw = localStorage.getItem(usedAbilitiesKey) || '[]';
+      let usedAbilities = [];
+      
+      try {
+        const parsed = JSON.parse(usedAbilitiesRaw);
+        // تأكد أن usedAbilities هو مصفوفة وليس كائن
+        if (Array.isArray(parsed)) {
+          // إذا كانت مصفوفة، استخرج text من كل عنصر إذا كان كائن
+          usedAbilities = parsed.map(item => {
+            if (typeof item === 'string') return item;
+            if (typeof item === 'object' && item !== null) {
+              return item.text || item.abilityText || item;
+            }
+            return item;
+          });
+        } else if (typeof parsed === 'object' && parsed !== null) {
+          // إذا كان كائن، حوله إلى مصفوفة من القيم
+          usedAbilities = Object.values(parsed).map(item => {
+            if (typeof item === 'string') return item;
+            if (typeof item === 'object' && item !== null) {
+              return item.text || item.abilityText || item;
+            }
+            return item;
+          });
+        } else if (typeof parsed === 'string') {
+          // إذا كان نص، حوله إلى مصفوفة
+          usedAbilities = [parsed];
+        } else {
+          usedAbilities = [];
+        }
+      } catch (e) {
+        console.warn('Error parsing used abilities:', e);
+        usedAbilities = [];
+      }
+      
+      // تأكد أن جميع العناصر هي نصوص قبل إنشاء Set
+      usedAbilities = usedAbilities.filter(item => typeof item === 'string' && item.length > 0);
       usedSet = new Set(usedAbilities);
       
       if (currentRound > 0) {

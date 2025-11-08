@@ -356,6 +356,143 @@ class SyncService {
   getGameId() {
     return this.gameId;
   }
+
+  /**
+   * إضافة بيانات جديدة إلى مسار Firebase (push)
+   */
+  async push(path, data) {
+    if (!this.gameId) {
+      console.error('❌ Sync not initialized');
+      return null;
+    }
+
+    try {
+      const fullPath = path.startsWith('/') ? path : `games/${this.gameId}/${path}`;
+      const dataRef = ref(database, fullPath);
+      const newRef = push(dataRef);
+      
+      const finalData = {
+        ...data,
+        id: data.id || newRef.key,
+        requestId: data.requestId || newRef.key
+      };
+      
+      // إضافة timestamp فقط إذا لم يكن موجوداً
+      if (!finalData.timestamp) {
+        finalData.timestamp = Date.now();
+      }
+      
+      await set(newRef, finalData);
+      
+      console.log(`✅ تم إضافة البيانات إلى ${fullPath}`);
+      return newRef.key;
+    } catch (error) {
+      console.error('❌ خطأ في إضافة البيانات:', error);
+      return null;
+    }
+  }
+
+  /**
+   * الاستماع لتغييرات في مسار Firebase (on)
+   */
+  on(path, callback) {
+    if (!this.gameId) {
+      console.error('❌ Sync not initialized');
+      return null;
+    }
+
+    try {
+      const fullPath = path.startsWith('/') ? path : `games/${this.gameId}/${path}`;
+      const dataRef = ref(database, fullPath);
+      
+      const unsubscribe = onValue(dataRef, (snapshot) => {
+        const data = snapshot.val();
+        callback(data);
+      }, (error) => {
+        console.error(`❌ خطأ في الاستماع إلى ${fullPath}:`, error);
+      });
+      
+      // حفظ المستمع لإيقافه لاحقاً
+      const listenerKey = `on_${fullPath}`;
+      this.listeners.set(listenerKey, unsubscribe);
+      
+      return unsubscribe;
+    } catch (error) {
+      console.error('❌ خطأ في إعداد المستمع:', error);
+      return null;
+    }
+  }
+
+  /**
+   * تحديث بيانات في مسار Firebase (update)
+   */
+  async update(path, data) {
+    if (!this.gameId) {
+      console.error('❌ Sync not initialized');
+      return false;
+    }
+
+    try {
+      const fullPath = path.startsWith('/') ? path : `games/${this.gameId}/${path}`;
+      const dataRef = ref(database, fullPath);
+      
+      await update(dataRef, {
+        ...data,
+        updatedAt: Date.now()
+      });
+      
+      console.log(`✅ تم تحديث البيانات في ${fullPath}`);
+      return true;
+    } catch (error) {
+      console.error('❌ خطأ في تحديث البيانات:', error);
+      return false;
+    }
+  }
+
+  /**
+   * جلب بيانات من مسار Firebase (get)
+   */
+  async get(path) {
+    if (!this.gameId) {
+      console.error('❌ Sync not initialized');
+      return null;
+    }
+
+    try {
+      const fullPath = path.startsWith('/') ? path : `games/${this.gameId}/${path}`;
+      const dataRef = ref(database, fullPath);
+      const snapshot = await get(dataRef);
+      
+      return snapshot.exists() ? snapshot.val() : null;
+    } catch (error) {
+      console.error('❌ خطأ في جلب البيانات:', error);
+      return null;
+    }
+  }
+
+  /**
+   * حذف بيانات من مسار Firebase (remove)
+   */
+  async remove(path) {
+    if (!this.gameId) {
+      console.error('❌ Sync not initialized');
+      return false;
+    }
+
+    try {
+      const fullPath = path.startsWith('/') ? path : `games/${this.gameId}/${path}`;
+      const dataRef = ref(database, fullPath);
+      
+      await remove(dataRef);
+      
+      console.log(`✅ تم حذف البيانات من ${fullPath}`);
+      return true;
+    } catch (error) {
+      console.error('❌ خطأ في حذف البيانات:', error);
+      return false;
+    }
+  }
+
 }
 
 // إنشاء instance واحد (Singleton)
