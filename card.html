@@ -282,38 +282,41 @@
       color: white;
     }
     
-    /* زر الزيادة - أخضر */
-    .round-btn:first-child {
-      background: linear-gradient(145deg, #10b981, #059669, #047857);
-      border-color: #10b981;
+    /* استبدال - استخدم فئات صريحة بدل:first-child/:last-child */
+    
+    /* زر الزيادة (أعلى) */
+    .round-btn.inc {
+      background: linear-gradient(145deg, #4d8bff, #3b82f6, #2563eb);
+      border-color: #3b82f6;
+      color: #ffffff;
     }
     
-    .round-btn:first-child:hover {
-      background: linear-gradient(145deg, #34d399, #10b981, #059669);
+    .round-btn.inc:hover {
+      background: linear-gradient(145deg, #60a5fa, #4d8bff, #3b82f6);
       transform: translateY(-3px) scale(1.08);
-      box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
-      border-color: #34d399;
+      box-shadow: 0 8px 25px rgba(59, 130, 246, 0.5);
+      border-color: #60a5fa;
     }
     
-    .round-btn:first-child:active {
+    .round-btn.inc:active {
       transform: translateY(-1px) scale(1.02);
-      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
     }
     
-    /* زر النقص - أحمر */
-    .round-btn:last-child {
+    /* زر النقص (أسفل) */
+    .round-btn.dec {
       background: linear-gradient(145deg, #ef4444, #dc2626, #b91c1c);
       border-color: #ef4444;
     }
     
-    .round-btn:last-child:hover {
+    .round-btn.dec:hover {
       background: linear-gradient(145deg, #f87171, #ef4444, #dc2626);
       transform: translateY(-3px) scale(1.08);
       box-shadow: 0 8px 25px rgba(239, 68, 68, 0.5);
       border-color: #f87171;
     }
     
-    .round-btn:last-child:active {
+    .round-btn.dec:active {
       transform: translateY(-1px) scale(1.02);
       box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
     }
@@ -368,8 +371,39 @@
     }
     
     /* Position health controls under notes boxes */
-    .arena .player-column:first-child .health{position:absolute; left:160px; top:850px; z-index:11; transform:translateX(-24px)}
-    .arena .player-column.right-panel .health{position:absolute; right:160px; top:850px; z-index:11; transform:translateX(24px)}
+    .arena .player-column:first-child .health{position:absolute; left:0px; top:100px; z-index:11; transform:translateX(-24px)}
+    .arena .player-column.right-panel .health{position:absolute; right:0px; top:100px; z-index:11; transform:translateX(24px)}
+    
+    /* ✅ أنماط عنصر "تمام" */
+    .ready-badge {
+      position: absolute;
+      top: -69px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(145deg, #16a34a, #15803d);
+      color: #fff;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-size: 20px;
+      font-weight: 900;
+      font-family: "Cairo", sans-serif;
+      border: 2px solid #fff;
+      box-shadow: 0 4px 15px rgba(22, 163, 74, 0.5);
+      z-index: 12;
+      white-space: nowrap;
+      animation: slideDown 0.3s ease-out;
+    }
+    
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
 
     .confirm-wrap{display:flex; justify-content:center; position:fixed; left:0; right:0; bottom:100px; z-index:50}
     .confirm{
@@ -1495,6 +1529,13 @@
     width: 100%;
     max-width: 200px;
   }
+
+  /* 🎨 مظهر القدرة المستخدمة */
+  .used-ability {
+    filter: brightness(0.6);
+    opacity: 0.6;
+    pointer-events: none;
+  }
 }
 
 </style>
@@ -1530,10 +1571,14 @@
         <div class="notes" aria-label="ملاحظات">
           <textarea id="player1Notes" placeholder="اكتب ملاحظات هنا..." onblur="saveNotes('player1', this.value)" oninput="saveNotes('player1', this.value)"></textarea>
         </div>
-        <div class="health">
-          <div class="round-btn" onclick="changeHealth('player1', 1)">▲</div>
+        <div class="health" style="position: relative;">
+          <!-- ✅ عنصر "تمام" للاعب 2 (الأيسر) -->
+          <div id="player2ReadyBadge" class="ready-badge" style="display: none;">
+            <span>تمام</span>
+          </div>
+          <div class="round-btn inc" onclick="changeHealth('player1', 1)">▲</div>
           <div class="value" id="health1" style="color:#fff">11</div>
-          <div class="round-btn" onclick="changeHealth('player1', -1)" style="color:#ff6969">▼</div>
+          <div class="round-btn dec" onclick="changeHealth('player1', -1)">▼</div>
         </div>
         
         
@@ -1553,10 +1598,14 @@
         <div class="notes" aria-label="ملاحظات">
           <textarea id="player2Notes" placeholder="اكتب ملاحظات هنا..." onblur="saveNotes('player2', this.value)" oninput="saveNotes('player2', this.value)"></textarea>
         </div>
-        <div class="health">
-          <div class="round-btn" onclick="changeHealth('player2', 1)">▲</div>
+        <div class="health" style="position: relative;">
+          <!-- ✅ عنصر "تمام" للاعب 1 (الأيمن) -->
+          <div id="player1ReadyBadge" class="ready-badge" style="display: none;">
+            <span>تمام</span>
+          </div>
+          <div class="round-btn inc" onclick="changeHealth('player2', 1)">▲</div>
           <div class="value" id="health2" style="color:#fff">11</div>
-          <div class="round-btn" onclick="changeHealth('player2', -1)" style="color:#ff6969">▼</div>
+          <div class="round-btn dec" onclick="changeHealth('player2', -1)">▼</div>
         </div>
         
         
@@ -1644,7 +1693,6 @@
 <script type="module" src="js/auth-service.js"></script>
 
 <script src="js/mode-normal.js"></script>
-<script src="js/mode-tournament.js"></script>
 
 <!-- ✅ New Ability Request System -->
 <script type="module" src="js/ability-request-system.js"></script>

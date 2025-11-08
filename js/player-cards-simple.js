@@ -112,6 +112,12 @@ if (gameId) {
       
       // ✅ بدء الاستماع لتغييرات usedAbilities من Firebase (لإعادة تفعيل القدرات)
       startUsedAbilitiesListener();
+      
+      // ✅ تحميل حالة "تمام" الحالية وتحديث الزر
+      loadPlayerReadyState();
+      
+      // ✅ بدء الاستماع لتغييرات حالة "تمام" من Firebase
+      startPlayerReadyListener();
     } else {
       console.warn('⚠️ Firebase sync failed to initialize, using localStorage only');
     }
@@ -1858,6 +1864,7 @@ function startUsedAbilitiesListener() {
     console.log('✅ بدء الاستماع لتغييرات usedAbilities من Firebase:', refPath);
 
     // ✅ تهيئة previousUsedAbilitiesSet من Firebase عند البدء
+    let isInitialized = false;
     get(usedAbilitiesRef).then((snapshot) => {
       const initialUsedAbilities = snapshot.val() || {};
       previousUsedAbilitiesSet = new Set();
@@ -1866,13 +1873,30 @@ function startUsedAbilitiesListener() {
         const abilityText = abilityData?.text || decodeURIComponent(abilityKey);
         previousUsedAbilitiesSet.add(abilityText);
       });
+      isInitialized = true;
       console.log('✅ تم تهيئة previousUsedAbilitiesSet:', Array.from(previousUsedAbilitiesSet));
     }).catch((error) => {
       console.error('❌ خطأ في تهيئة previousUsedAbilitiesSet:', error);
+      isInitialized = true; // حتى لو فشلت التهيئة، نبدأ الاستماع
     });
     
     // ✅ الاستماع لتغييرات usedAbilities باستخدام onValue (أكثر موثوقية)
     onValue(usedAbilitiesRef, (snapshot) => {
+      // ✅ تجاهل الاستدعاء الأول حتى يتم التهيئة
+      if (!isInitialized) {
+        // تهيئة سريعة من snapshot الحالي
+        const initialUsedAbilities = snapshot.val() || {};
+        previousUsedAbilitiesSet = new Set();
+        Object.keys(initialUsedAbilities).forEach(abilityKey => {
+          const abilityData = initialUsedAbilities[abilityKey];
+          const abilityText = abilityData?.text || decodeURIComponent(abilityKey);
+          previousUsedAbilitiesSet.add(abilityText);
+        });
+        isInitialized = true;
+        console.log('✅ تم تهيئة previousUsedAbilitiesSet من onValue:', Array.from(previousUsedAbilitiesSet));
+        return; // تجاهل هذا الاستدعاء
+      }
+      
       const currentUsedAbilities = snapshot.val() || {};
       const currentSet = new Set();
       
@@ -1883,29 +1907,47 @@ function startUsedAbilitiesListener() {
         currentSet.add(abilityText);
       });
       
+      // ✅ تسجيل الحالة الحالية والسابقة للمقارنة
+      console.log('📊 مقارنة القدرات المستخدمة:', {
+        previous: Array.from(previousUsedAbilitiesSet),
+        current: Array.from(currentSet)
+      });
+      
       // ✅ العثور على القدرات التي تم حذفها (إعادة تفعيلها)
       previousUsedAbilitiesSet.forEach(abilityText => {
         if (!currentSet.has(abilityText)) {
           // ✅ هذه القدرة تم حذفها (إعادة تفعيلها)
           console.log('🔄 تم إعادة تفعيل القدرة من Firebase:', abilityText);
+          console.log('📋 تفاصيل إعادة التفعيل:', {
+            abilityText,
+            playerParam,
+            previousSet: Array.from(previousUsedAbilitiesSet),
+            currentSet: Array.from(currentSet)
+          });
           
           // ✅ إزالة من tempUsed
           tempUsed.delete(abilityText);
+          console.log('✅ تم إزالة القدرة من tempUsed:', abilityText);
           
           // ✅ تحديث myAbilities
+          const beforeUpdate = myAbilities.length;
           myAbilities = (myAbilities || []).map(a => {
             const text = a.text || a;
             if (text === abilityText) {
+              console.log('🔄 تحديث myAbilities - إعادة تفعيل:', text);
               return { ...a, used: false };
             }
             return a;
           });
+          console.log('✅ تم تحديث myAbilities:', { before: beforeUpdate, after: myAbilities.length });
           
           // ✅ تحديث localStorage
           const usedAbilitiesKey = `${playerParam}UsedAbilities`;
           let usedAbilities = JSON.parse(localStorage.getItem(usedAbilitiesKey) || '[]');
+          const beforeFilter = usedAbilities.length;
           usedAbilities = usedAbilities.filter(ability => ability !== abilityText);
           localStorage.setItem(usedAbilitiesKey, JSON.stringify(usedAbilities));
+          console.log('✅ تم تحديث usedAbilities في localStorage:', { before: beforeFilter, after: usedAbilities.length });
           
           // ✅ تحديث القدرات في localStorage
           const abilitiesKey = `${playerParam}Abilities`;
@@ -1913,15 +1955,21 @@ function startUsedAbilitiesListener() {
           const updatedAbilities = abilities.map(ability => {
             const text = typeof ability === 'string' ? ability : (ability.text || ability);
             if (text === abilityText) {
+              console.log('🔄 تحديث abilities في localStorage - إعادة تفعيل:', text);
               return typeof ability === 'string' ? { text: ability, used: false } : { ...ability, used: false };
             }
             return typeof ability === 'string' ? { text: ability, used: ability.used || false } : ability;
           });
           localStorage.setItem(abilitiesKey, JSON.stringify(updatedAbilities));
+          console.log('✅ تم تحديث abilities في localStorage:', updatedAbilities.length, 'قدرة');
           
           // ✅ تحديث الواجهة
           if (abilitiesWrap) {
+            console.log('🎨 إعادة رسم الواجهة...');
             renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+            console.log('✅ تم إعادة رسم الواجهة');
+          } else {
+            console.warn('⚠️ abilitiesWrap غير موجود - لا يمكن تحديث الواجهة');
           }
           
           if (abilityStatus) {
@@ -1939,27 +1987,35 @@ function startUsedAbilitiesListener() {
       });
       
       // ✅ تحديث previousUsedAbilitiesSet للمقارنة التالية
-      previousUsedAbilitiesSet = currentSet;
+      previousUsedAbilitiesSet = new Set(currentSet);
+      console.log('✅ تم تحديث previousUsedAbilitiesSet:', Array.from(previousUsedAbilitiesSet));
     }, (error) => {
       console.error('❌ خطأ في مستمع usedAbilities:', error);
     });
     
     // ✅ أيضاً الاستماع لحذف القدرات المستخدمة (عند إعادة تفعيلها من قبل المضيف)
     onChildRemoved(usedAbilitiesRef, (snapshot) => {
+      console.log('🔔 onChildRemoved تم استدعاؤه:', snapshot.key);
+      
       const abilityData = snapshot.val();
       const abilityKey = snapshot.key;
+      
+      console.log('📋 بيانات snapshot:', { abilityData, abilityKey });
       
       // ✅ استخراج abilityText من abilityData أو من abilityKey
       let abilityText = null;
       if (abilityData && abilityData.text) {
         abilityText = abilityData.text;
+        console.log('✅ تم استخراج abilityText من abilityData:', abilityText);
       } else if (abilityKey) {
         // إذا لم يكن هناك abilityData، فاستخدم abilityKey (المشفر)
         try {
           abilityText = decodeURIComponent(abilityKey);
+          console.log('✅ تم استخراج abilityText من abilityKey (فك التشفير):', abilityText);
         } catch (e) {
           // إذا فشل فك التشفير، استخدم abilityKey كما هو
           abilityText = abilityKey;
+          console.log('⚠️ فشل فك التشفير، استخدام abilityKey كما هو:', abilityText);
         }
       }
       
@@ -4098,6 +4154,109 @@ function openBattleView() {
     alert('حدث خطأ في فتح صفحة عرض التحدي: ' + error.message);
   }
 }
+
+// ✅ دالة تبديل حالة "تمام" للاعب
+async function togglePlayerReady() {
+  try {
+    const currentGameId = localStorage.getItem('currentGameId') || gameId || 'default-game';
+    
+    if (!database || !currentGameId || !playerParam) {
+      console.warn('⚠️ Firebase database أو gameId أو playerParam غير موجودين');
+      return;
+    }
+
+    const readyRef = ref(database, `games/${currentGameId}/players/${playerParam}/ready`);
+    
+    // جلب الحالة الحالية
+    const currentSnapshot = await get(readyRef);
+    const currentReady = currentSnapshot.val() || false;
+    const newReady = !currentReady;
+    
+    // تحديث الحالة في Firebase
+    await set(readyRef, newReady);
+    
+    // ✅ تحديث الزر مباشرة (سيتم تحديثه تلقائياً أيضاً من المستمع)
+    updateReadyButton(newReady);
+    
+    console.log(`✅ تم ${newReady ? 'تفعيل' : 'إلغاء'} حالة "تمام" للاعب ${playerParam}`);
+    
+  } catch (error) {
+    console.error('❌ خطأ في تبديل حالة "تمام":', error);
+  }
+}
+
+// ✅ تحميل حالة "تمام" الحالية وتحديث الزر
+async function loadPlayerReadyState() {
+  try {
+    const currentGameId = localStorage.getItem('currentGameId') || gameId || 'default-game';
+    
+    if (!database || !currentGameId || !playerParam) {
+      console.warn('⚠️ Firebase database أو gameId أو playerParam غير موجودين');
+      return;
+    }
+
+    const readyRef = ref(database, `games/${currentGameId}/players/${playerParam}/ready`);
+    const snapshot = await get(readyRef);
+    const isReady = snapshot.val() || false;
+    
+    // تحديث الزر
+    updateReadyButton(isReady);
+    
+    console.log(`✅ تم تحميل حالة "تمام" للاعب ${playerParam}:`, isReady);
+    
+  } catch (error) {
+    console.error('❌ خطأ في تحميل حالة "تمام":', error);
+  }
+}
+
+// ✅ تحديث زر "تمام" بناءً على الحالة
+function updateReadyButton(isReady) {
+  const confirmReadyBtn = document.getElementById('confirmReadyBtn');
+  if (confirmReadyBtn) {
+    if (isReady) {
+      confirmReadyBtn.textContent = '❌ إلغاء تمام';
+      confirmReadyBtn.className = confirmReadyBtn.className.replace('bg-green-600 hover:bg-green-700', 'bg-red-600 hover:bg-red-700');
+    } else {
+      confirmReadyBtn.textContent = '✅ تمام';
+      confirmReadyBtn.className = confirmReadyBtn.className.replace('bg-red-600 hover:bg-red-700', 'bg-green-600 hover:bg-green-700');
+    }
+  }
+}
+
+// ✅ مستمع لتغييرات حالة "تمام" من Firebase
+function startPlayerReadyListener() {
+  if (!database || !gameId || !playerParam) {
+    console.warn('⚠️ Firebase database أو gameId أو playerParam غير موجودين - لن يتم تشغيل مستمع حالة "تمام"');
+    return;
+  }
+
+  try {
+    const currentGameId = localStorage.getItem('currentGameId') || gameId || 'default-game';
+    const readyRef = ref(database, `games/${currentGameId}/players/${playerParam}/ready`);
+    
+    console.log('✅ بدء الاستماع لتغييرات حالة "تمام" من Firebase:', `games/${currentGameId}/players/${playerParam}/ready`);
+    
+    // ✅ الاستماع لتغييرات حالة "تمام" باستخدام onValue
+    onValue(readyRef, (snapshot) => {
+      const isReady = snapshot.val() || false;
+      console.log(`🔔 تغيير في حالة "تمام" للاعب ${playerParam}:`, isReady);
+      
+      // ✅ تحديث الزر تلقائياً
+      updateReadyButton(isReady);
+      
+      console.log(`✅ تم تحديث زر "تمام" للاعب ${playerParam}:`, isReady ? 'تمام' : 'غير تمام');
+    }, (error) => {
+      console.error('❌ خطأ في مستمع حالة "تمام":', error);
+    });
+    
+    console.log('✅ مستمع حالة "تمام" من Firebase نشط');
+  } catch (error) {
+    console.error('❌ خطأ في بدء مستمع حالة "تمام" من Firebase:', error);
+  }
+}
+
+// جعل الدالة متاحة عالمياً
+window.togglePlayerReady = togglePlayerReady;
 
 // Check battle status and enable/disable battle view button
 function checkBattleStatus() {
