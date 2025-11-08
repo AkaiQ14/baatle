@@ -2833,6 +2833,9 @@ window.addEventListener('abilityToggled', function(e) {
             }, 3000);
           }
         }
+        
+        // ✅ بعد تعديل used داخل الحدث، إعادة تحميل القدرات من Firebase
+        loadPlayerAbilities();
       }
     }
 
