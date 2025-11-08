@@ -360,10 +360,7 @@ async function checkPlayerStatus() {
       }
     }
     
-    // ✅ إظهار رابط اللاعب الثاني بعد اكتمال اختيار الكروت (وليس الترتيب)
-    if (player1CardsSelected) {
-      showPlayer2Link();
-    }
+    // ✅ رابط اللاعب الثاني يظهر مباشرة - لا نحتاج التحقق من حالة اللاعب الأول
     
     // Update player 2 status message
     const player2StatusMessage = document.getElementById('player2StatusMessage');
@@ -445,10 +442,7 @@ function checkPlayerStatusLocalStorage() {
       }
     }
     
-    // ✅ إظهار رابط اللاعب الثاني بعد اكتمال اختيار الكروت (وليس الترتيب)
-    if (player1CardsSelected) {
-      showPlayer2Link();
-    }
+    // ✅ رابط اللاعب الثاني يظهر مباشرة - لا نحتاج التحقق من حالة اللاعب الأول
     
     // Update player 2 status message
     const player2StatusMessage = document.getElementById('player2StatusMessage');
@@ -613,8 +607,8 @@ async function init() {
     // Setup real-time listening
     setupRealTimeListening();
     
-    // إخفاء رابط اللاعب الثاني في البداية
-    hidePlayer2Link();
+    // ✅ إظهار رابطي اللاعبين معاً مباشرة بعد توزيع القدرات
+    // لا نحتاج إخفاء رابط اللاعب الثاني - يظهران معاً من البداية
     
     // Add explicit event listener for battle start button
     const battleBtn = document.getElementById('battleBtn');
@@ -677,10 +671,7 @@ function updatePlayerStatus(gameData) {
     }
   }
   
-  // ✅ إظهار رابط اللاعب الثاني بعد اكتمال اختيار الكروت (وليس الترتيب)
-  if (player1CardsSelected) {
-    showPlayer2Link();
-  }
+  // ✅ رابط اللاعب الثاني يظهر مباشرة - لا نحتاج التحقق من حالة اللاعب الأول
   
   // Update player 2 status message
   const player2StatusMessage = document.getElementById('player2StatusMessage');

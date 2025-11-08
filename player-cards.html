@@ -359,6 +359,50 @@
         font-size: 18px;
       }
     }
+    
+    /* ✅ أنيميشن للكروت المختارة */
+    @keyframes slideInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    /* ✅ أنماط الكروت المختارة */
+    .selected-card-wrapper {
+      position: relative;
+      width: 120px;
+      height: 168px;
+      border: none;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: rgba(0, 0, 0, 0.5);
+    }
+    
+    .selected-card-wrapper:hover {
+      transform: scale(1.1) translateY(-5px);
+      box-shadow: 0 8px 25px rgba(255, 215, 0, 0.5);
+    }
+    
+    @media (max-width: 768px) {
+      .selected-card-wrapper {
+        width: 100px;
+        height: 140px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .selected-card-wrapper {
+        width: 80px;
+        height: 112px;
+      }
+    }
   </style>
 </head>
 <body class="bg-[#4B0E1F] text-white p-6 min-h-screen flex flex-col items-center space-y-6" style="font-family: Cairo, sans-serif; background-image: url('images/QG14Background.png'); background-size: cover; background-repeat: no-repeat; background-attachment: fixed; background-position: center center; box-sizing: border-box; position: relative;">
@@ -367,6 +411,14 @@
   <div id="cardGrid" class="w-full max-w-[1235px] mx-auto relative z-10">
     <!-- Cards will be populated here -->
   </div>
+
+  <!-- Selected Cards Section -->
+  <section id="selectedCardsSection" class="w-full max-w-[1235px] mx-auto mt-4 p-3 rounded bg-transparent border border-yellow-400 relative z-10 hidden">
+    <p class="font-bold mb-2 text-center md:text-right">الكروت المختارة:</p>
+    <div id="selectedCardsContainer" class="flex flex-wrap gap-3 justify-center md:justify-start">
+      <!-- Selected cards will be populated here -->
+    </div>
+  </section>
 
   <!-- Your abilities -->
   <section id="abilitiesPanel" class="w-full max-w-[1235px] mx-auto mt-4 p-3 rounded bg-transparent border border-yellow-400 relative z-10">
