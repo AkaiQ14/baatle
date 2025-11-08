@@ -240,6 +240,8 @@ const tempUsed = new Set();           // optimistic, per-request (text)
 const pendingRequests = new Map();    // requestId -> abilityText
 const processedRequests = new Set();  // ✅ تتبع الطلبات المعالجة لمنع التداخل
 
+/* ================== 🔮 نظام طلب القدرات عبر Firebase ================== */
+
 /* ================== Helpers ================== */
 
 // Normalize to [{text, used}]
@@ -1241,6 +1243,8 @@ async function loadGameData() {
       }
       // ✅ عرض الكروت المختارة مسبقاً في الشبكة
       renderCardSelectionGrid(cardSlots);
+      // ✅ عرض الكروت المختارة في الأسفل
+      renderSelectedCards();
       
       // ✅ إذا ما زالت مرحلة الاختيار، أعد فتح البطاقة
       if (isSelectionPhase && selectedCards.length < rounds) {
@@ -1277,6 +1281,8 @@ async function loadGameData() {
       if (instruction) {
         instruction.textContent = `اللاعب ${playerName} رتب بطاقاتك`;
       }
+      // ✅ إخفاء الكروت المختارة عند تحميل الصفحة إذا كان الاختيار مكتملاً
+      renderSelectedCards();
       renderCards(picks);
     } else {
       // إذا لم توجد بطاقات، عرض رسالة خطأ
@@ -2653,6 +2659,9 @@ function renderCardSelectionGrid(slots) {
     grid.style.opacity = '1';
   }, 50);
   
+  // ✅ عرض الكروت المختارة في الأسفل
+  renderSelectedCards();
+  
   // تحديث حالة زر المتابعة
   if (continueBtn) {
     if (selectedCards.length >= rounds) {
@@ -2662,6 +2671,64 @@ function renderCardSelectionGrid(slots) {
     } else {
       continueBtn.classList.add("hidden");
     }
+  }
+}
+
+// ✅ دالة لعرض الكروت المختارة في الأسفل بجانب بعضها
+function renderSelectedCards() {
+  const selectedCardsSection = document.getElementById('selectedCardsSection');
+  const selectedCardsContainer = document.getElementById('selectedCardsContainer');
+  
+  if (!selectedCardsSection || !selectedCardsContainer) return;
+  
+  // ✅ إخفاء القسم إذا اكتمل الاختيار (انتقلنا لمرحلة الترتيب)
+  if (!isSelectionPhase || selectedCards.length >= rounds) {
+    selectedCardsSection.classList.add('hidden');
+    return;
+  }
+  
+  // إظهار القسم إذا كان هناك كروت مختارة ولم يكتمل الاختيار
+  if (selectedCards.length > 0) {
+    selectedCardsSection.classList.remove('hidden');
+    selectedCardsContainer.innerHTML = '';
+    
+    // ترتيب الكروت حسب slotIndex
+    const sortedSelectedCards = [...selectedCards].sort((a, b) => a.slotIndex - b.slotIndex);
+    
+    sortedSelectedCards.forEach((selectedCard, index) => {
+      const cardWrapper = document.createElement('div');
+      cardWrapper.className = 'selected-card-wrapper';
+      cardWrapper.style.cssText = `
+        position: relative;
+        width: 120px;
+        height: 168px;
+        border: none;
+        border-radius: 8px;
+        overflow: hidden;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: rgba(0, 0, 0, 0.5);
+        animation: slideInUp 0.3s ease ${index * 0.05}s backwards;
+      `;
+      
+      // تأثير hover
+      cardWrapper.onmouseenter = () => {
+        cardWrapper.style.transform = 'scale(1.1) translateY(-5px)';
+        cardWrapper.style.boxShadow = '0 8px 25px rgba(255, 215, 0, 0.5)';
+      };
+      cardWrapper.onmouseleave = () => {
+        cardWrapper.style.transform = 'scale(1) translateY(0)';
+        cardWrapper.style.boxShadow = 'none';
+      };
+      
+      // الكرت
+      const cardMedia = createMedia(selectedCard.cardPath, "w-full h-full object-contain");
+      cardWrapper.appendChild(cardMedia);
+      
+      selectedCardsContainer.appendChild(cardWrapper);
+    });
+  } else {
+    selectedCardsSection.classList.add('hidden');
   }
 }
 
@@ -2944,7 +3011,7 @@ async function openCardSelectionModal(slotIndex, slotCards) {
       // إغلاق modal
       document.body.removeChild(modal);
       
-      // إعادة عرض الشبكة
+      // ✅ إعادة عرض الشبكة والكروت المختارة
       renderCardSelectionGrid(cardSlots);
       
       // إذا تم جمع العدد المطلوب، الانتقال لمرحلة الترتيب
@@ -2954,6 +3021,9 @@ async function openCardSelectionModal(slotIndex, slotCards) {
         // ✅ حفظ حالة isSelectionPhase بعد الانتقال لمرحلة الترتيب
         localStorage.setItem(`${playerParam}IsSelectionPhase_${gameId}`, JSON.stringify(false));
         localStorage.setItem(PICKS_LOCAL_KEY, JSON.stringify(picks));
+        
+        // ✅ إخفاء الكروت المختارة عند اكتمال الاختيار
+        renderSelectedCards();
         
         // ✅ حفظ علامة أن اللاعب أنهى اختيار الكروت في Firebase (لإظهار رابط اللاعب الثاني)
         if (gameId && playerParam === 'player1') {
