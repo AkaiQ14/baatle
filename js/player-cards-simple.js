@@ -2,7 +2,7 @@
 import { GameService } from './gameService.js';
 import { auth, database } from './firebase-init.js';
 import syncService from './sync-service.js';
-import { ref, onChildChanged, onChildRemoved, onValue, get, set } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
+import { ref, onChildAdded, onChildChanged, onChildRemoved, onValue, get, set } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
 
 // ========== حماية من التداخل بين اللاعبين ==========
 // تم إضافة حماية لمنع إعادة تعيين ترتيب اللاعب الآخر عند تأكيد ترتيب أحد اللاعبين
@@ -115,6 +115,9 @@ if (gameId) {
       
       // ✅ بدء الاستماع لتغييرات القدرات من Firebase (لإضافة/نقل القدرات)
       startAbilitiesListener();
+      
+      // ✅ بدء الاستماع لتحديثات القدرات الفورية (للهواتف)
+      startAbilityUpdatesListener();
       
       // ✅ تحميل حالة "تمام" الحالية وتحديث الزر
       loadPlayerReadyState();
@@ -2205,13 +2208,13 @@ function startAbilitiesListener() {
         abilitiesArray = Object.values(firebaseAbilities);
       }
       
-      // ✅ تجاهل إذا كانت القدرات فارغة (قد يكون هذا التحديث الأولي)
-      if (abilitiesArray.length === 0) {
-        console.log('⚠️ القدرات فارغة في Firebase - تجاهل التحديث');
+      console.log('📥 تحديث القدرات من Firebase:', abilitiesArray.length, 'قدرة');
+      
+      // ✅ إذا كانت القدرات فارغة، لا نحدث (لكن نسمح بالتحديثات الفارغة للتنظيف)
+      if (abilitiesArray.length === 0 && myAbilities.length === 0) {
+        console.log('⚠️ القدرات فارغة في Firebase و localStorage - تجاهل التحديث');
         return;
       }
-      
-      console.log('📥 تحديث القدرات من Firebase:', abilitiesArray.length, 'قدرة');
       
       // ✅ تحديث myAbilities مع الحفاظ على حالة used من usedAbilities
       const usedAbilitiesKey = `${playerParam}UsedAbilities`;
@@ -2232,10 +2235,12 @@ function startAbilitiesListener() {
       const abilitiesKey = `${playerParam}Abilities`;
       localStorage.setItem(abilitiesKey, JSON.stringify(myAbilities));
       
-      // ✅ تحديث الواجهة
+      // ✅ تحديث الواجهة فوراً (مهم للهواتف)
       if (abilitiesWrap) {
+        // ✅ مسح الواجهة أولاً للتحديث الفوري
+        abilitiesWrap.innerHTML = '';
         renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
-        console.log('✅ تم تحديث واجهة القدرات من Firebase');
+        console.log('✅ تم تحديث واجهة القدرات من Firebase (فوري)');
       }
       
       console.log(`✅ تم تحديث ${myAbilities.length} قدرة للاعب ${playerParam} من Firebase`);
@@ -2246,6 +2251,81 @@ function startAbilitiesListener() {
     console.log('✅ مستمع abilities من Firebase نشط');
   } catch (error) {
     console.error('❌ خطأ في بدء مستمع abilities من Firebase:', error);
+  }
+}
+
+/**
+ * ✅ بدء الاستماع لتحديثات القدرات الفورية من Firebase (للهواتف)
+ * يستمع لـ abilityUpdates للتحديثات الفورية
+ */
+function startAbilityUpdatesListener() {
+  if (!database || !gameId) {
+    console.warn('⚠️ Firebase database أو gameId غير موجودين - لن يتم تشغيل مستمع abilityUpdates');
+    return;
+  }
+
+  try {
+    const refPath = `games/${gameId}/abilityUpdates`;
+    const updatesRef = ref(database, refPath);
+
+    console.log('✅ بدء الاستماع لتحديثات القدرات الفورية من Firebase:', refPath);
+
+    // ✅ الاستماع لتحديثات جديدة (child_added)
+    onChildAdded(updatesRef, (snapshot) => {
+      const update = snapshot.val();
+      if (!update) return;
+
+      console.log('📥 تحديث فوري للقدرات:', update);
+
+      // ✅ إذا كان التحديث خاص باللاعب الحالي، تحديث فوري
+      if (update.playerParam === playerParam || update.toPlayer === playerParam) {
+        console.log('🔄 تحديث فوري للاعب الحالي - إعادة تحميل القدرات');
+        
+        // ✅ إعادة تحميل القدرات من Firebase فوراً
+        const abilitiesRef = ref(database, `games/${gameId}/players/${playerParam}/abilities`);
+        get(abilitiesRef).then((snapshot) => {
+          const firebaseAbilities = snapshot.val() || [];
+          
+          let abilitiesArray = [];
+          if (Array.isArray(firebaseAbilities)) {
+            abilitiesArray = firebaseAbilities;
+          } else if (typeof firebaseAbilities === 'object') {
+            abilitiesArray = Object.values(firebaseAbilities);
+          }
+          
+          if (abilitiesArray.length > 0) {
+            // ✅ تحديث myAbilities مع الحفاظ على حالة used
+            const usedAbilitiesKey = `${playerParam}UsedAbilities`;
+            const usedAbilities = JSON.parse(localStorage.getItem(usedAbilitiesKey) || '[]');
+            const usedSet = new Set(usedAbilities);
+            
+            myAbilities = abilitiesArray.map(ability => {
+              const text = typeof ability === 'string' ? ability : (ability.text || ability);
+              const isUsed = usedSet.has(text) || (typeof ability === 'object' && ability.used === true);
+              return {
+                text: text,
+                used: isUsed
+              };
+            });
+            
+            // ✅ حفظ في localStorage
+            const abilitiesKey = `${playerParam}Abilities`;
+            localStorage.setItem(abilitiesKey, JSON.stringify(myAbilities));
+            
+            // ✅ تحديث الواجهة فوراً
+            if (abilitiesWrap) {
+              abilitiesWrap.innerHTML = '';
+              renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+              console.log('✅ تم تحديث واجهة القدرات فوراً من abilityUpdates');
+            }
+          }
+        }).catch(err => console.error('❌ خطأ في تحميل القدرات:', err));
+      }
+    });
+
+    console.log('✅ مستمع abilityUpdates من Firebase نشط');
+  } catch (error) {
+    console.error('❌ خطأ في بدء مستمع abilityUpdates من Firebase:', error);
   }
 }
 

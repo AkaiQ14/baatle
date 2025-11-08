@@ -1697,22 +1697,41 @@ function renderAbilitiesPanel(key, container, fromName, toName){
             usedAbilities.push(ab.text);
           }
           
-          // ✅ حفظ تفعيل القدرة في Firebase Realtime Database
+          // ✅ حفظ تفعيل القدرة في Firebase Realtime Database (فوري بدون await)
           if (database) {
             const gameId = localStorage.getItem('currentGameId') || 'default-game';
             const abilityKey = encodeURIComponent(ab.text);
             const usedRef = ref(database, `games/${gameId}/players/${playerParam}/usedAbilities/${abilityKey}`);
             
-            try {
-              await set(usedRef, {
-                text: ab.text,
-                usedAt: Date.now(),
-                usedBy: fromName
-              });
+            // ✅ تحديث فوري بدون انتظار (للمزامنة السريعة على الهواتف)
+            set(usedRef, {
+              text: ab.text,
+              usedAt: Date.now(),
+              usedBy: fromName
+            }).then(() => {
               console.log(`✅ تم تفعيل القدرة في Firebase للاعب ${playerParam}:`, ab.text);
-            } catch (error) {
+              
+              // ✅ تحديث فوري للقدرات الكاملة في Firebase
+              const abilitiesKey = `${playerParam}Abilities`;
+              let abilities = JSON.parse(localStorage.getItem(abilitiesKey) || '[]');
+              if (!abilities || abilities.length === 0) {
+                const globalKey = playerParam === 'player1' ? P1_ABILITIES_KEY : P2_ABILITIES_KEY;
+                abilities = JSON.parse(localStorage.getItem(globalKey) || '[]');
+              }
+              
+              const updatedAbilities = abilities.map(ability => {
+                const text = typeof ability === 'string' ? ability : (ability.text || ability);
+                if (text === ab.text) {
+                  return typeof ability === 'string' ? { text: ability, used: true } : { ...ability, used: true };
+                }
+                return typeof ability === 'string' ? { text: ability, used: ability.used || false } : ability;
+              });
+              
+              const abilitiesRef = ref(database, `games/${gameId}/players/${playerParam}/abilities`);
+              set(abilitiesRef, updatedAbilities).catch(err => console.error('❌ خطأ في تحديث القدرات:', err));
+            }).catch((error) => {
               console.error('❌ خطأ في تفعيل القدرة في Firebase:', error);
-            }
+            });
           }
           
           // رسالة تأكيد
@@ -1737,23 +1756,32 @@ function renderAbilitiesPanel(key, container, fromName, toName){
               refPath: `games/${gameId}/players/${playerParam}/usedAbilities/${abilityKey}`
             });
             
-            // حذف القدرة المستخدمة من Firebase
+            // حذف القدرة المستخدمة من Firebase (فوري بدون await)
             remove(usedRef).then(() => {
               console.log(`✅ تم إعادة تفعيل القدرة في Firebase للاعب ${playerParam}:`, ab.text);
-              console.log('✅ تم حذف القدرة من Firebase بنجاح:', {
-                abilityText: ab.text,
-                abilityKey,
-                playerParam
+              
+              // ✅ تحديث فوري للقدرات الكاملة في Firebase
+              const abilitiesKey = `${playerParam}Abilities`;
+              let abilities = JSON.parse(localStorage.getItem(abilitiesKey) || '[]');
+              if (!abilities || abilities.length === 0) {
+                const globalKey = playerParam === 'player1' ? P1_ABILITIES_KEY : P2_ABILITIES_KEY;
+                abilities = JSON.parse(localStorage.getItem(globalKey) || '[]');
+              }
+              
+              const updatedAbilities = abilities.map(ability => {
+                const text = typeof ability === 'string' ? ability : (ability.text || ability);
+                if (text === ab.text) {
+                  return typeof ability === 'string' ? { text: ability, used: false } : { ...ability, used: false };
+                }
+                return typeof ability === 'string' ? { text: ability, used: ability.used || false } : ability;
               });
+              
+              const abilitiesRef = ref(database, `games/${gameId}/players/${playerParam}/abilities`);
+              set(abilitiesRef, updatedAbilities).then(() => {
+                console.log('✅ تم تحديث القدرات في Firebase بعد إعادة التفعيل');
+              }).catch(err => console.error('❌ خطأ في تحديث القدرات:', err));
             }).catch((error) => {
               console.error('❌ خطأ في إعادة تفعيل القدرة في Firebase:', error);
-              console.error('❌ تفاصيل الخطأ:', {
-                error: error.message,
-                code: error.code,
-                abilityText: ab.text,
-                abilityKey,
-                playerParam
-              });
             });
           } else {
             console.warn('⚠️ Firebase database غير متاح - لا يمكن حذف القدرة من Firebase');
@@ -1998,36 +2026,29 @@ function renderPanels(){
       renderAbilitiesPanel(P2_ABILITIES_KEY, player2Container, player2, player1);
     }
     
-    // ✅ حفظ القدرات في Firebase بعد العرض (لضمان المزامنة)
+    // ✅ حفظ القدرات في Firebase بعد العرض (لضمان المزامنة الفورية)
     if (database) {
       const gameId = localStorage.getItem('currentGameId') || 'default-game';
       
-      try {
-        // تحميل القدرات الحالية
-        const player1Abilities = loadPlayerAbilities('player1');
-        const player2Abilities = loadPlayerAbilities('player2');
-        
-        // حفظ قدرات اللاعب 1 في Firebase
-        if (player1Abilities.length > 0) {
-          const player1AbilitiesRef = ref(database, `games/${gameId}/players/player1/abilities`);
-          set(player1AbilitiesRef, player1Abilities).then(() => {
-            console.log('✅ تم حفظ قدرات اللاعب 1 في Firebase (من renderPanels)');
-          }).catch((error) => {
-            console.error('❌ خطأ في حفظ قدرات اللاعب 1 في Firebase:', error);
-          });
-        }
-        
-        // حفظ قدرات اللاعب 2 في Firebase
-        if (player2Abilities.length > 0) {
-          const player2AbilitiesRef = ref(database, `games/${gameId}/players/player2/abilities`);
-          set(player2AbilitiesRef, player2Abilities).then(() => {
-            console.log('✅ تم حفظ قدرات اللاعب 2 في Firebase (من renderPanels)');
-          }).catch((error) => {
-            console.error('❌ خطأ في حفظ قدرات اللاعب 2 في Firebase:', error);
-          });
-        }
-      } catch (error) {
-        console.error('❌ خطأ في حفظ القدرات في Firebase:', error);
+      // ✅ تحديث فوري بدون انتظار (للمزامنة السريعة على الهواتف)
+      // تحميل القدرات الحالية
+      const player1Abilities = loadPlayerAbilities('player1');
+      const player2Abilities = loadPlayerAbilities('player2');
+      
+      // حفظ قدرات اللاعب 1 في Firebase (فوري)
+      if (player1Abilities.length > 0) {
+        const player1AbilitiesRef = ref(database, `games/${gameId}/players/player1/abilities`);
+        set(player1AbilitiesRef, player1Abilities).catch((error) => {
+          console.error('❌ خطأ في حفظ قدرات اللاعب 1 في Firebase:', error);
+        });
+      }
+      
+      // حفظ قدرات اللاعب 2 في Firebase (فوري)
+      if (player2Abilities.length > 0) {
+        const player2AbilitiesRef = ref(database, `games/${gameId}/players/player2/abilities`);
+        set(player2AbilitiesRef, player2Abilities).catch((error) => {
+          console.error('❌ خطأ في حفظ قدرات اللاعب 2 في Firebase:', error);
+        });
       }
     }
     
@@ -2674,28 +2695,29 @@ async function confirmAddAbility() {
       });
       localStorage.setItem(playerAbilitiesKey, JSON.stringify(currentAbilities));
       
-      // ✅ حفظ القدرات المضافة في Firebase Realtime Database
+      // ✅ حفظ القدرات المضافة في Firebase Realtime Database (فوري بدون await)
       if (database) {
         const gameId = localStorage.getItem('currentGameId') || 'default-game';
         const abilitiesRef = ref(database, `games/${gameId}/players/${playerParam}/abilities`);
         
-        try {
-          await set(abilitiesRef, currentAbilities);
+        // ✅ تحديث فوري بدون انتظار (للمزامنة السريعة على الهواتف)
+        set(abilitiesRef, currentAbilities).then(() => {
           console.log(`✅ تم حفظ القدرات المضافة في Firebase للاعب ${playerParam}`);
           
-          // ✅ إرسال إشعار تحديث للاعبين
+          // ✅ إرسال إشعار تحديث فوري للاعبين
           const updateTimestamp = Date.now();
           const updateRef = ref(database, `games/${gameId}/abilityUpdates/${updateTimestamp}`);
-          await set(updateRef, {
+          set(updateRef, {
             type: 'ABILITIES_ADDED',
             playerParam: playerParam,
             abilities: newAbilities,
             timestamp: updateTimestamp
-          });
-          console.log('✅ تم إرسال إشعار إضافة القدرات للاعبين');
-        } catch (error) {
+          }).then(() => {
+            console.log('✅ تم إرسال إشعار إضافة القدرات للاعبين');
+          }).catch(err => console.error('❌ خطأ في إرسال الإشعار:', err));
+        }).catch((error) => {
           console.error('❌ خطأ في حفظ القدرات المضافة في Firebase:', error);
-        }
+        });
       }
     }
     
@@ -2910,37 +2932,37 @@ function openTransferModal(fromKey, fromName, toName){
         receiver.push({ text:moved.text, used:moved.used });
         saveAbilities(toKey, receiver);
 
-        // ✅ حفظ نقل القدرة في Firebase Realtime Database
+        // ✅ حفظ نقل القدرة في Firebase Realtime Database (فوري بدون await)
         if (database) {
           const gameId = localStorage.getItem('currentGameId') || 'default-game';
           const fromPlayerParam = (fromName === player1) ? 'player1' : 'player2';
           const toPlayerParam = (toName === player1) ? 'player1' : 'player2';
           
-          try {
-            // تحديث القدرات في Firebase للاعب المرسل
-            const fromAbilitiesRef = ref(database, `games/${gameId}/players/${fromPlayerParam}/abilities`);
-            await set(fromAbilitiesRef, sender);
+          // ✅ تحديث فوري بدون انتظار (للمزامنة السريعة على الهواتف)
+          // تحديث القدرات في Firebase للاعب المرسل
+          const fromAbilitiesRef = ref(database, `games/${gameId}/players/${fromPlayerParam}/abilities`);
+          set(fromAbilitiesRef, sender).then(() => {
             console.log(`✅ تم تحديث قدرات ${fromPlayerParam} في Firebase`);
-            
-            // تحديث القدرات في Firebase للاعب المستقبل
-            const toAbilitiesRef = ref(database, `games/${gameId}/players/${toPlayerParam}/abilities`);
-            await set(toAbilitiesRef, receiver);
+          }).catch(err => console.error('❌ خطأ في تحديث قدرات المرسل:', err));
+          
+          // تحديث القدرات في Firebase للاعب المستقبل
+          const toAbilitiesRef = ref(database, `games/${gameId}/players/${toPlayerParam}/abilities`);
+          set(toAbilitiesRef, receiver).then(() => {
             console.log(`✅ تم تحديث قدرات ${toPlayerParam} في Firebase`);
             
-            // ✅ إرسال إشعار تحديث للاعبين
+            // ✅ إرسال إشعار تحديث فوري للاعبين
             const updateTimestamp = Date.now();
             const updateRef = ref(database, `games/${gameId}/abilityUpdates/${updateTimestamp}`);
-            await set(updateRef, {
+            set(updateRef, {
               type: 'ABILITY_TRANSFERRED',
               fromPlayer: fromPlayerParam,
               toPlayer: toPlayerParam,
               abilityText: moved.text,
               timestamp: updateTimestamp
-            });
-            console.log('✅ تم إرسال إشعار نقل القدرة للاعبين');
-          } catch (error) {
-            console.error('❌ خطأ في حفظ نقل القدرة في Firebase:', error);
-          }
+            }).then(() => {
+              console.log('✅ تم إرسال إشعار نقل القدرة للاعبين');
+            }).catch(err => console.error('❌ خطأ في إرسال الإشعار:', err));
+          }).catch(err => console.error('❌ خطأ في تحديث قدرات المستقبل:', err));
         }
 
         closeTransferModal();
