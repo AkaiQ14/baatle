@@ -39,7 +39,7 @@ let voiceSystem = {
       // Removed: 'Goku UI', 
       'Hashirama', 'Hawks', 'Hinata', 'Hisoka', 'jiraya', 'Riboku', 'Lelouch', 'Utsuro', 'Kyurak', 'Shinobu',
       // Changed: 'joker' to 'Joker'
-      'Joker', 'Kaido', 'KaitoKid', 'Kanki', 'Shigaraki', 'Roselle-Gustav',
+      'Joker', 'Kaido', 'KaitoKid', 'Kanki', 'Shigaraki', 'Roselle-Gustav', 'Broly',
       'law', 'Lelouch', 'LuffyGear5', 'madara', 'Meruem', 'naruto', 'Neiji', 'Netero', 'obito',
       'QG14', 'queen', 'Sakamoto', 'shikamaru', 'ShanksCard', 'Silva Zoldyck', 'smith', 'UmibozoCard',
       // Removed: 'Vegetto', 
@@ -81,6 +81,7 @@ let voiceSystem = {
       'Ayanokoji': 'Ayanokoji',
       'Beru': 'Beru',
       'Bakugo': 'Bakugo',
+      'Broly': 'Broly',
       'Cell': 'Cell',
       'Dio': 'Dio',
       'ErenCard': 'ErenCard',
