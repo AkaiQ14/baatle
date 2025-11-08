@@ -2215,8 +2215,9 @@ function startAbilitiesListener() {
         const abilitiesKey = `${playerParam}Abilities`;
         localStorage.setItem(abilitiesKey, JSON.stringify(myAbilities));
         
-        // ✅ تحديث الواجهة
+        // ✅ تحديث الواجهة فوراً
         if (abilitiesWrap) {
+          abilitiesWrap.innerHTML = '';
           renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
           console.log('✅ تم تحديث واجهة القدرات من Firebase (التحميل الأولي)');
         }
@@ -4131,6 +4132,129 @@ document.addEventListener('visibilitychange', function() {
 // Initialize card manager when page loads - مع حماية من التكرار
 let isInitialized = false;
 document.addEventListener('DOMContentLoaded', function() {
+  console.log(`✅ تحميل القدرات فور دخول اللاعب ${playerParam} للصفحة`);
+  
+  // ✅ التحقق من وجود abilitiesWrap
+  if (!abilitiesWrap) {
+    console.error(`❌ abilitiesWrap غير موجود للاعب ${playerParam} - لا يمكن عرض القدرات`);
+    return;
+  }
+  
+  // ✅ التحقق من gameId و database
+  const currentGameId = gameId || localStorage.getItem('currentGameId') || localStorage.getItem(`${playerParam}_currentGameId`);
+  if (!currentGameId) {
+    console.warn(`⚠️ gameId غير موجود للاعب ${playerParam} - سيتم استخدام localStorage فقط`);
+  }
+  
+  // ✅ تحميل القدرات من localStorage أولاً (للسرعة)
+  loadPlayerAbilities();
+  
+  // ✅ بدء مستمع التحديثات الفورية (لكلا اللاعبين)
+  if (database && currentGameId) {
+    console.log(`✅ بدء مستمع التحديثات الفورية للاعب ${playerParam} في gameId: ${currentGameId}`);
+    startAbilityUpdatesListener();
+    
+    // ✅ محاولة تحميل القدرات من Firebase مباشرة (لكلا اللاعبين)
+    const abilitiesRef = ref(database, `games/${currentGameId}/players/${playerParam}/abilities`);
+    console.log(`📥 محاولة تحميل القدرات من Firebase للاعب ${playerParam}: games/${currentGameId}/players/${playerParam}/abilities`);
+    get(abilitiesRef).then((snapshot) => {
+      const firebaseAbilities = snapshot.val() || [];
+      
+      let abilitiesArray = [];
+      if (Array.isArray(firebaseAbilities)) {
+        abilitiesArray = firebaseAbilities;
+      } else if (typeof firebaseAbilities === 'object') {
+        abilitiesArray = Object.values(firebaseAbilities);
+      }
+      
+      if (abilitiesArray.length > 0) {
+        console.log(`📥 تحميل القدرات من Firebase في DOMContentLoaded للاعب ${playerParam}:`, abilitiesArray.length, 'قدرة');
+        
+        // ✅ تحديث myAbilities مع الحفاظ على حالة used
+        const usedAbilitiesKey = `${playerParam}UsedAbilities`;
+        const usedAbilities = JSON.parse(localStorage.getItem(usedAbilitiesKey) || '[]');
+        const usedSet = new Set(usedAbilities);
+        
+        myAbilities = abilitiesArray.map(ability => {
+          const text = typeof ability === 'string' ? ability : (ability.text || ability);
+          const isUsed = usedSet.has(text) || (typeof ability === 'object' && ability.used === true);
+          return {
+            text: text,
+            used: isUsed
+          };
+        });
+        
+        // ✅ حفظ في localStorage
+        const abilitiesKey = `${playerParam}Abilities`;
+        localStorage.setItem(abilitiesKey, JSON.stringify(myAbilities));
+        
+        // ✅ تحديث الواجهة فوراً
+        if (abilitiesWrap) {
+          abilitiesWrap.innerHTML = '';
+          renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+          console.log(`✅ تم عرض القدرات من Firebase في DOMContentLoaded للاعب ${playerParam}`);
+        }
+      } else {
+        console.log(`⚠️ لا توجد قدرات في Firebase للاعب ${playerParam} - سيتم استخدام localStorage`);
+        // إذا لم توجد في Firebase، تأكد من عرض القدرات من localStorage
+        if (myAbilities && myAbilities.length > 0 && abilitiesWrap) {
+          abilitiesWrap.innerHTML = '';
+          renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+          console.log(`✅ تم عرض القدرات من localStorage للاعب ${playerParam}`);
+        }
+      }
+    }).catch((error) => {
+      console.error(`❌ خطأ في تحميل القدرات من Firebase للاعب ${playerParam}:`, error);
+      // إذا فشل التحميل من Firebase، تأكد من عرض القدرات من localStorage
+      if (myAbilities && myAbilities.length > 0 && abilitiesWrap) {
+        abilitiesWrap.innerHTML = '';
+        renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+        console.log(`✅ تم عرض القدرات من localStorage للاعب ${playerParam} (بعد فشل Firebase)`);
+      }
+    });
+  } else {
+    console.warn(`⚠️ Firebase غير متاح للاعب ${playerParam} - سيتم استخدام localStorage فقط`);
+    // إذا لم يكن Firebase متاحاً، تأكد من عرض القدرات من localStorage
+    if (myAbilities && myAbilities.length > 0 && abilitiesWrap) {
+      abilitiesWrap.innerHTML = '';
+      renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+      console.log(`✅ تم عرض القدرات من localStorage للاعب ${playerParam} (Firebase غير متاح)`);
+    }
+  }
+  
+  // ✅ عرض القدرات فوراً إذا كانت متوفرة (بعد تأخير قصير) - لكلا اللاعبين
+  setTimeout(() => {
+    if (myAbilities && myAbilities.length > 0 && abilitiesWrap) {
+      // ✅ التحقق من أن القدرات لم يتم عرضها بالفعل
+      if (abilitiesWrap.children.length === 0) {
+        abilitiesWrap.innerHTML = '';
+        renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+        console.log(`✅ عرض القدرات فوراً عند دخول اللاعب ${playerParam} (بعد التأخير)`);
+      }
+    } else {
+      console.warn(`⚠️ لا توجد قدرات للعرض للاعب ${playerParam}:`, { 
+        myAbilities: myAbilities?.length, 
+        abilitiesWrap: !!abilitiesWrap,
+        playerParam: playerParam 
+      });
+      
+      // ✅ محاولة إعادة تحميل القدرات إذا لم تكن موجودة
+      if (!myAbilities || myAbilities.length === 0) {
+        console.log(`🔄 محاولة إعادة تحميل القدرات للاعب ${playerParam}...`);
+        loadPlayerAbilities();
+        
+        // ✅ محاولة أخرى بعد تأخير إضافي
+        setTimeout(() => {
+          if (myAbilities && myAbilities.length > 0 && abilitiesWrap && abilitiesWrap.children.length === 0) {
+            abilitiesWrap.innerHTML = '';
+            renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+            console.log(`✅ تم عرض القدرات للاعب ${playerParam} بعد إعادة التحميل`);
+          }
+        }, 500);
+      }
+    }
+  }, 500);
+  
   // ✅ حماية: منع التهيئة المكررة
   if (isInitialized) {
     console.log("⚠️ تم التهيئة بالفعل - تجاهل التهيئة المكررة");
