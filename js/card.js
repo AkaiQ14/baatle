@@ -1640,7 +1640,7 @@ function renderAbilitiesPanel(key, container, fromName, toName){
       // إضافة أيقونة لتوضيح إمكانية الإلغاء
       const displayText = isUsed ? `🔄 ${ab.text} (انقر للإلغاء)` : ab.text;
       
-      const btn = abilityButton(displayText, ()=>{
+      const btn = abilityButton(displayText, async ()=>{
         console.log(`Ability clicked: ${ab.text}, current state: ${isUsed}`);
         
         // Toggle ability usage for host
@@ -1696,6 +1696,25 @@ function renderAbilitiesPanel(key, container, fromName, toName){
           if (!usedAbilities.includes(ab.text)) {
             usedAbilities.push(ab.text);
           }
+          
+          // ✅ حفظ تفعيل القدرة في Firebase Realtime Database
+          if (database) {
+            const gameId = localStorage.getItem('currentGameId') || 'default-game';
+            const abilityKey = encodeURIComponent(ab.text);
+            const usedRef = ref(database, `games/${gameId}/players/${playerParam}/usedAbilities/${abilityKey}`);
+            
+            try {
+              await set(usedRef, {
+                text: ab.text,
+                usedAt: Date.now(),
+                usedBy: fromName
+              });
+              console.log(`✅ تم تفعيل القدرة في Firebase للاعب ${playerParam}:`, ab.text);
+            } catch (error) {
+              console.error('❌ خطأ في تفعيل القدرة في Firebase:', error);
+            }
+          }
+          
           // رسالة تأكيد
           showToast(`✅ تم تفعيل القدرة: ${ab.text}`, []);
         } else {
@@ -2555,7 +2574,7 @@ function closeAddAbilityModal() {
   }
 }
 
-function confirmAddAbility() {
+async function confirmAddAbility() {
   const modal = document.getElementById("addAbilityModal");
   const playerParam = modal.dataset.playerParam;
   const playerName = playerParam === 'player1' ? player1 : player2;
@@ -2621,6 +2640,30 @@ function confirmAddAbility() {
         currentAbilities.push({ text: ability, used: false });
       });
       localStorage.setItem(playerAbilitiesKey, JSON.stringify(currentAbilities));
+      
+      // ✅ حفظ القدرات المضافة في Firebase Realtime Database
+      if (database) {
+        const gameId = localStorage.getItem('currentGameId') || 'default-game';
+        const abilitiesRef = ref(database, `games/${gameId}/players/${playerParam}/abilities`);
+        
+        try {
+          await set(abilitiesRef, currentAbilities);
+          console.log(`✅ تم حفظ القدرات المضافة في Firebase للاعب ${playerParam}`);
+          
+          // ✅ إرسال إشعار تحديث للاعبين
+          const updateTimestamp = Date.now();
+          const updateRef = ref(database, `games/${gameId}/abilityUpdates/${updateTimestamp}`);
+          await set(updateRef, {
+            type: 'ABILITIES_ADDED',
+            playerParam: playerParam,
+            abilities: newAbilities,
+            timestamp: updateTimestamp
+          });
+          console.log('✅ تم إرسال إشعار إضافة القدرات للاعبين');
+        } catch (error) {
+          console.error('❌ خطأ في حفظ القدرات المضافة في Firebase:', error);
+        }
+      }
     }
     
     // 2. Add to global abilities library (savedAbilities)
@@ -2824,7 +2867,7 @@ function openTransferModal(fromKey, fromName, toName){
       opt.className="ability-option";
       opt.style.fontFamily = '"Cairo", sans-serif';
       opt.textContent = ab.text;
-      opt.onclick = ()=>{
+      opt.onclick = async ()=>{
         const sender = loadAbilities(fromKey);
         const moved  = sender.splice(idx,1)[0];
         saveAbilities(fromKey, sender);
@@ -2833,6 +2876,39 @@ function openTransferModal(fromKey, fromName, toName){
         const receiver = loadAbilities(toKey);
         receiver.push({ text:moved.text, used:moved.used });
         saveAbilities(toKey, receiver);
+
+        // ✅ حفظ نقل القدرة في Firebase Realtime Database
+        if (database) {
+          const gameId = localStorage.getItem('currentGameId') || 'default-game';
+          const fromPlayerParam = (fromName === player1) ? 'player1' : 'player2';
+          const toPlayerParam = (toName === player1) ? 'player1' : 'player2';
+          
+          try {
+            // تحديث القدرات في Firebase للاعب المرسل
+            const fromAbilitiesRef = ref(database, `games/${gameId}/players/${fromPlayerParam}/abilities`);
+            await set(fromAbilitiesRef, sender);
+            console.log(`✅ تم تحديث قدرات ${fromPlayerParam} في Firebase`);
+            
+            // تحديث القدرات في Firebase للاعب المستقبل
+            const toAbilitiesRef = ref(database, `games/${gameId}/players/${toPlayerParam}/abilities`);
+            await set(toAbilitiesRef, receiver);
+            console.log(`✅ تم تحديث قدرات ${toPlayerParam} في Firebase`);
+            
+            // ✅ إرسال إشعار تحديث للاعبين
+            const updateTimestamp = Date.now();
+            const updateRef = ref(database, `games/${gameId}/abilityUpdates/${updateTimestamp}`);
+            await set(updateRef, {
+              type: 'ABILITY_TRANSFERRED',
+              fromPlayer: fromPlayerParam,
+              toPlayer: toPlayerParam,
+              abilityText: moved.text,
+              timestamp: updateTimestamp
+            });
+            console.log('✅ تم إرسال إشعار نقل القدرة للاعبين');
+          } catch (error) {
+            console.error('❌ خطأ في حفظ نقل القدرة في Firebase:', error);
+          }
+        }
 
         closeTransferModal();
         renderPanels();
@@ -4916,35 +4992,183 @@ function showAbilityRequestPopup(req) {
     return;
   }
   
-  // أنشئ العنصر بالـ id الآمن
+  // ✅ إنشاء عنصر الإشعار بتصميم متطور
   const popup = document.createElement("div");
   popup.id = safeId;
   popup.className = "ability-popup";
   popup.style.cssText = `
     position: fixed;
-    top: 30px;
+    bottom: 30px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(30,30,30,0.95);
+    background: linear-gradient(145deg, #1e293b, #0f172a);
     color: #fff;
-    padding: 20px 25px;
-    border-radius: 14px;
-    border: 2px solid gold;
+    padding: 0;
+    border-radius: 20px;
+    border: 2px solid #f3c21a;
     z-index: 9999;
     font-family: 'Cairo', sans-serif;
-    box-shadow: 0 0 20px rgba(255,215,0,0.3);
+    box-shadow: 0 10px 40px rgba(243, 194, 26, 0.4), 0 0 30px rgba(243, 194, 26, 0.2);
     text-align: center;
-    width: 340px;
+    min-width: 420px;
+    max-width: 500px;
+    overflow: hidden;
+    animation: slideUpNotification 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    backdrop-filter: blur(10px);
   `;
   
+  // ✅ إضافة أنيميشن CSS إذا لم يكن موجوداً
+  if (!document.getElementById('ability-popup-styles')) {
+    const style = document.createElement('style');
+    style.id = 'ability-popup-styles';
+    style.textContent = `
+      @keyframes slideUpNotification {
+        from {
+          opacity: 0;
+          transform: translateX(-50%) translateY(100px) scale(0.8);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0) scale(1);
+        }
+      }
+      @keyframes pulseGlow {
+        0%, 100% {
+          box-shadow: 0 10px 40px rgba(243, 194, 26, 0.4), 0 0 30px rgba(243, 194, 26, 0.2);
+        }
+        50% {
+          box-shadow: 0 10px 50px rgba(243, 194, 26, 0.6), 0 0 40px rgba(243, 194, 26, 0.4);
+        }
+      }
+      @keyframes rotate {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .ability-popup {
+        animation: slideUpNotification 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), pulseGlow 2s ease-in-out infinite;
+      }
+      .ability-popup-btn {
+        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        position: relative;
+        overflow: hidden;
+      }
+      .ability-popup-btn::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+        transform: translate(-50%, -50%);
+        transition: width 0.6s, height 0.6s;
+      }
+      .ability-popup-btn:hover::before {
+        width: 300px;
+        height: 300px;
+      }
+      .ability-popup-btn:hover {
+        transform: translateY(-2px) scale(1.05);
+      }
+      .ability-popup-btn:active {
+        transform: translateY(0) scale(0.98);
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  
   popup.innerHTML = `
-    <p style="font-size:16px;margin-bottom:10px;">
-      ✨ اللاعب <b style="color:#ffd700">${playerName}</b> يطلب استخدام القدرة:<br>
-      <span style="color:#87cefa;">${abilityText}</span>
-    </p>
-    <div style="margin-top:12px;">
-      <button id="accept_${requestId}" style="margin:0 10px;padding:6px 14px;background:#1a9c35;border:none;border-radius:8px;color:#fff;font-weight:bold;cursor:pointer;">قبول</button>
-      <button id="reject_${requestId}" style="margin:0 10px;padding:6px 14px;background:#a82020;border:none;border-radius:8px;color:#fff;font-weight:bold;cursor:pointer;">رفض</button>
+    <div style="
+      background: linear-gradient(135deg, rgba(243, 194, 26, 0.15), rgba(243, 194, 26, 0.05));
+      padding: 20px 25px;
+      border-bottom: 1px solid rgba(243, 194, 26, 0.3);
+    ">
+      <div style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 12px;
+      ">
+        <span style="
+          font-size: 32px;
+          margin-left: 12px;
+          animation: rotate 2s linear infinite;
+        ">🎯</span>
+        <div style="flex: 1;">
+          <div style="
+            font-size: 14px;
+            color: #94a3b8;
+            margin-bottom: 4px;
+            font-weight: 600;
+          ">طلب استخدام قدرة</div>
+          <div style="
+            font-size: 18px;
+            font-weight: 900;
+            color: #60a5fa;
+            text-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+          ">${playerName}</div>
+        </div>
+      </div>
+      <div style="
+        background: linear-gradient(135deg, rgba(96, 165, 250, 0.1), rgba(147, 197, 253, 0.1));
+        padding: 12px 16px;
+        border-radius: 12px;
+        border: 1px solid rgba(96, 165, 250, 0.3);
+        margin-top: 10px;
+      ">
+        <div style="
+          font-size: 13px;
+          color: #cbd5e1;
+          margin-bottom: 6px;
+          font-weight: 600;
+        ">القدرة المطلوبة:</div>
+        <div style="
+          font-size: 20px;
+          font-weight: 900;
+          color: #fbbf24;
+          text-shadow: 0 0 15px rgba(251, 191, 36, 0.6);
+          line-height: 1.4;
+        ">${abilityText}</div>
+      </div>
+    </div>
+    <div style="
+      padding: 18px 25px;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      background: rgba(15, 23, 42, 0.5);
+    ">
+      <button id="accept_${requestId}" class="ability-popup-btn" style="
+        flex: 1;
+        padding: 12px 24px;
+        background: linear-gradient(145deg, #16a34a, #15803d);
+        border: none;
+        border-radius: 12px;
+        color: #fff;
+        font-weight: 900;
+        font-size: 16px;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(22, 163, 74, 0.4);
+        font-family: 'Cairo', sans-serif;
+      ">✅ قبول</button>
+      <button id="reject_${requestId}" class="ability-popup-btn" style="
+        flex: 1;
+        padding: 12px 24px;
+        background: linear-gradient(145deg, #dc2626, #b91c1c);
+        border: none;
+        border-radius: 12px;
+        color: #fff;
+        font-weight: 900;
+        font-size: 16px;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(220, 38, 38, 0.4);
+        font-family: 'Cairo', sans-serif;
+      ">❌ رفض</button>
     </div>
   `;
   document.body.appendChild(popup);

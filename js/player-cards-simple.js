@@ -113,6 +113,9 @@ if (gameId) {
       // ✅ بدء الاستماع لتغييرات usedAbilities من Firebase (لإعادة تفعيل القدرات)
       startUsedAbilitiesListener();
       
+      // ✅ بدء الاستماع لتغييرات القدرات من Firebase (لإضافة/نقل القدرات)
+      startAbilitiesListener();
+      
       // ✅ تحميل حالة "تمام" الحالية وتحديث الزر
       loadPlayerReadyState();
       
@@ -2118,6 +2121,72 @@ function startUsedAbilitiesListener() {
     console.log('✅ مستمع usedAbilities من Firebase نشط');
   } catch (error) {
     console.error('❌ خطأ في بدء مستمع usedAbilities من Firebase:', error);
+  }
+}
+
+/**
+ * ✅ بدء الاستماع لتغييرات القدرات من Firebase (لإضافة/نقل القدرات)
+ */
+function startAbilitiesListener() {
+  if (!database || !gameId || !playerParam) {
+    console.warn('⚠️ Firebase database أو gameId أو playerParam غير موجودين - لن يتم تشغيل مستمع abilities');
+    return;
+  }
+
+  try {
+    const refPath = `games/${gameId}/players/${playerParam}/abilities`;
+    const abilitiesRef = ref(database, refPath);
+
+    console.log('✅ بدء الاستماع لتغييرات abilities من Firebase:', refPath);
+
+    // ✅ الاستماع لتغييرات abilities باستخدام onValue
+    onValue(abilitiesRef, (snapshot) => {
+      const firebaseAbilities = snapshot.val() || [];
+      
+      // ✅ التأكد من أن firebaseAbilities مصفوفة
+      let abilitiesArray = [];
+      if (Array.isArray(firebaseAbilities)) {
+        abilitiesArray = firebaseAbilities;
+      } else if (typeof firebaseAbilities === 'object') {
+        // إذا كان كائن، حوله إلى مصفوفة
+        abilitiesArray = Object.values(firebaseAbilities);
+      }
+      
+      console.log('📥 تحديث القدرات من Firebase:', abilitiesArray.length, 'قدرة');
+      
+      // ✅ تحديث myAbilities مع الحفاظ على حالة used من usedAbilities
+      const usedAbilitiesKey = `${playerParam}UsedAbilities`;
+      const usedAbilities = JSON.parse(localStorage.getItem(usedAbilitiesKey) || '[]');
+      const usedSet = new Set(usedAbilities);
+      
+      // ✅ تحديث myAbilities مع دمج حالة used
+      myAbilities = abilitiesArray.map(ability => {
+        const text = typeof ability === 'string' ? ability : (ability.text || ability);
+        const isUsed = usedSet.has(text) || (typeof ability === 'object' && ability.used === true);
+        return {
+          text: text,
+          used: isUsed
+        };
+      });
+      
+      // ✅ حفظ في localStorage
+      const abilitiesKey = `${playerParam}Abilities`;
+      localStorage.setItem(abilitiesKey, JSON.stringify(myAbilities));
+      
+      // ✅ تحديث الواجهة
+      if (abilitiesWrap) {
+        renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+        console.log('✅ تم تحديث واجهة القدرات من Firebase');
+      }
+      
+      console.log(`✅ تم تحديث ${myAbilities.length} قدرة للاعب ${playerParam} من Firebase`);
+    }, (error) => {
+      console.error('❌ خطأ في مستمع abilities:', error);
+    });
+
+    console.log('✅ مستمع abilities من Firebase نشط');
+  } catch (error) {
+    console.error('❌ خطأ في بدء مستمع abilities من Firebase:', error);
   }
 }
 
