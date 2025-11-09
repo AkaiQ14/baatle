@@ -274,7 +274,13 @@ function normalizeAbilityList(arr) {
 
 function renderBadges(container, abilities, { clickable = false, onClick } = {}) {
   if (!container) {
-    console.error('Container not found for renderBadges');
+    console.error('❌ Container not found for renderBadges');
+    return;
+  }
+  
+  // ✅ التأكد من أن container موجود في DOM
+  if (!container.parentNode) {
+    console.error('❌ Container not in DOM for renderBadges');
     return;
   }
   
@@ -287,9 +293,24 @@ function renderBadges(container, abilities, { clickable = false, onClick } = {})
   
   container.innerHTML = "";
   const list = Array.isArray(abilities) ? abilities : [];
-  console.log('Rendering badges:', { list, clickable });
+  console.log(`🎨 Rendering badges للاعب ${playerParam}:`, { 
+    listLength: list.length, 
+    clickable,
+    containerId: container.id,
+    containerExists: !!container
+  });
   
-  list.forEach(ab => {
+  if (list.length === 0) {
+    console.warn(`⚠️ لا توجد قدرات للعرض للاعب ${playerParam}`);
+    return;
+  }
+  
+  list.forEach((ab, index) => {
+    if (!ab || !ab.text) {
+      console.warn(`⚠️ قدرة غير صحيحة في الفهرس ${index}:`, ab);
+      return;
+    }
+    
     const isUsed = !!ab.used;
     const el = document.createElement(clickable ? "button" : "span");
     el.textContent = ab.text;
@@ -315,7 +336,13 @@ function renderBadges(container, abilities, { clickable = false, onClick } = {})
         }; 
       }
     }
-    container.appendChild(el);
+    
+    try {
+      container.appendChild(el);
+      console.log(`✅ تم إضافة القدرة ${index + 1}/${list.length}: ${ab.text}`);
+    } catch (e) {
+      console.error(`❌ خطأ في إضافة القدرة ${ab.text}:`, e);
+    }
   });
   
   // ✅ إعادة الشفافية بسرعة
@@ -325,7 +352,15 @@ function renderBadges(container, abilities, { clickable = false, onClick } = {})
     }, 50);
   }
   
-  console.log('Badges rendered successfully');
+  // ✅ التحقق من أن القدرات تم عرضها
+  setTimeout(() => {
+    const renderedCount = container.children.length;
+    if (renderedCount === list.length) {
+      console.log(`✅ تم عرض ${renderedCount} قدرة بنجاح للاعب ${playerParam}`);
+    } else {
+      console.error(`❌ فشل عرض بعض القدرات للاعب ${playerParam}: متوقع ${list.length}, معروض ${renderedCount}`);
+    }
+  }, 100);
 }
 
 function hideOpponentPanel() {
@@ -2508,9 +2543,19 @@ function loadPlayerAbilities() {
       setTimeout(() => {
         if (abilitiesWrap && abilitiesWrap.children.length === 0) {
           console.log('Re-rendering abilities after delay...');
+          abilitiesWrap.innerHTML = '';
           renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
         }
       }, 100);
+      
+      // ✅ فحص إضافي بعد تأخير أطول للتأكد من ظهور القدرات
+      setTimeout(() => {
+        if (abilitiesWrap && abilitiesWrap.children.length === 0 && myAbilities && myAbilities.length > 0) {
+          console.log('⚠️ القدرات لم تظهر بعد التأخير - إعادة عرضها...');
+          abilitiesWrap.innerHTML = '';
+          renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+        }
+      }, 1000);
       
       // Check for any pending requests immediately after loading
       setTimeout(checkAbilityRequests, 100);
@@ -2578,9 +2623,19 @@ function loadPlayerAbilities() {
           setTimeout(() => {
             if (abilitiesWrap && abilitiesWrap.children.length === 0) {
               console.log('Re-rendering abilities from gameSetupProgress after delay...');
+              abilitiesWrap.innerHTML = '';
               renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
             }
           }, 100);
+          
+          // ✅ فحص إضافي بعد تأخير أطول للتأكد من ظهور القدرات
+          setTimeout(() => {
+            if (abilitiesWrap && abilitiesWrap.children.length === 0 && myAbilities && myAbilities.length > 0) {
+              console.log('⚠️ القدرات من gameSetupProgress لم تظهر بعد التأخير - إعادة عرضها...');
+              abilitiesWrap.innerHTML = '';
+              renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+            }
+          }, 1000);
           
           return;
         }
@@ -4222,38 +4277,173 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
-  // ✅ عرض القدرات فوراً إذا كانت متوفرة (بعد تأخير قصير) - لكلا اللاعبين
-  setTimeout(() => {
-    if (myAbilities && myAbilities.length > 0 && abilitiesWrap) {
-      // ✅ التحقق من أن القدرات لم يتم عرضها بالفعل
-      if (abilitiesWrap.children.length === 0) {
+  // ✅ دالة لإعادة عرض القدرات إذا اختفت
+  function ensureAbilitiesVisible() {
+    if (!abilitiesWrap) {
+      console.error(`❌ abilitiesWrap غير موجود للاعب ${playerParam}`);
+      return;
+    }
+    
+    console.log(`🔍 فحص القدرات للاعب ${playerParam}:`, {
+      myAbilitiesLength: myAbilities?.length || 0,
+      abilitiesWrapChildren: abilitiesWrap.children.length,
+      abilitiesWrapInnerHTML: abilitiesWrap.innerHTML.substring(0, 100)
+    });
+    
+    // ✅ إذا كانت القدرات موجودة في myAbilities ولكن غير معروضة
+    if (myAbilities && myAbilities.length > 0) {
+      const hasVisibleAbilities = abilitiesWrap.children.length > 0;
+      const isEmptyMessage = abilitiesWrap.innerHTML.includes('لا توجد قدرات');
+      
+      if (!hasVisibleAbilities || isEmptyMessage) {
+        console.log(`🔄 إعادة عرض القدرات للاعب ${playerParam} (${myAbilities.length} قدرة)`);
+        console.log('📋 القدرات:', myAbilities);
         abilitiesWrap.innerHTML = '';
         renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
-        console.log(`✅ عرض القدرات فوراً عند دخول اللاعب ${playerParam} (بعد التأخير)`);
-      }
-    } else {
-      console.warn(`⚠️ لا توجد قدرات للعرض للاعب ${playerParam}:`, { 
-        myAbilities: myAbilities?.length, 
-        abilitiesWrap: !!abilitiesWrap,
-        playerParam: playerParam 
-      });
-      
-      // ✅ محاولة إعادة تحميل القدرات إذا لم تكن موجودة
-      if (!myAbilities || myAbilities.length === 0) {
-        console.log(`🔄 محاولة إعادة تحميل القدرات للاعب ${playerParam}...`);
-        loadPlayerAbilities();
         
-        // ✅ محاولة أخرى بعد تأخير إضافي
+        // ✅ التحقق من أن القدرات تم عرضها
         setTimeout(() => {
-          if (myAbilities && myAbilities.length > 0 && abilitiesWrap && abilitiesWrap.children.length === 0) {
+          if (abilitiesWrap.children.length === 0) {
+            console.error(`❌ فشل عرض القدرات للاعب ${playerParam} - إعادة المحاولة...`);
             abilitiesWrap.innerHTML = '';
             renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
-            console.log(`✅ تم عرض القدرات للاعب ${playerParam} بعد إعادة التحميل`);
+          } else {
+            console.log(`✅ تم عرض ${abilitiesWrap.children.length} قدرة للاعب ${playerParam}`);
           }
-        }, 500);
+        }, 200);
+      }
+    } else {
+      // ✅ إذا لم تكن القدرات محملة، حاول تحميلها من مصادر متعددة
+      console.log(`⚠️ myAbilities فارغة للاعب ${playerParam} - محاولة التحميل...`);
+      
+      // ✅ محاولة 1: من localStorage
+      const abilitiesKey = `${playerParam}Abilities`;
+      const savedAbilities = localStorage.getItem(abilitiesKey);
+      
+      if (savedAbilities) {
+        try {
+          const abilitiesRaw = JSON.parse(savedAbilities);
+          let abilities = [];
+          if (Array.isArray(abilitiesRaw)) {
+            abilities = abilitiesRaw;
+          } else if (typeof abilitiesRaw === 'object') {
+            abilities = Object.values(abilitiesRaw);
+          }
+          
+          if (abilities.length > 0) {
+            console.log(`🔄 تحميل وعرض ${abilities.length} قدرة من localStorage للاعب ${playerParam}`);
+            loadPlayerAbilities();
+            
+            // ✅ بعد التحميل، تأكد من العرض
+            setTimeout(() => {
+              if (myAbilities && myAbilities.length > 0 && abilitiesWrap.children.length === 0) {
+                console.log(`🔄 عرض القدرات بعد التحميل للاعب ${playerParam}`);
+                abilitiesWrap.innerHTML = '';
+                renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+              }
+            }, 300);
+          }
+        } catch (e) {
+          console.error('Error parsing abilities:', e);
+        }
+      }
+      
+      // ✅ محاولة 2: من Firebase
+      if (database && currentGameId) {
+        const abilitiesRef = ref(database, `games/${currentGameId}/players/${playerParam}/abilities`);
+        get(abilitiesRef).then((snapshot) => {
+          const firebaseAbilities = snapshot.val() || [];
+          let abilitiesArray = [];
+          if (Array.isArray(firebaseAbilities)) {
+            abilitiesArray = firebaseAbilities;
+          } else if (typeof firebaseAbilities === 'object') {
+            abilitiesArray = Object.values(firebaseAbilities);
+          }
+          
+          if (abilitiesArray.length > 0) {
+            console.log(`🔄 تحميل ${abilitiesArray.length} قدرة من Firebase للاعب ${playerParam}`);
+            const usedAbilitiesKey = `${playerParam}UsedAbilities`;
+            const usedAbilities = JSON.parse(localStorage.getItem(usedAbilitiesKey) || '[]');
+            const usedSet = new Set(usedAbilities);
+            
+            myAbilities = abilitiesArray.map(ability => {
+              const text = typeof ability === 'string' ? ability : (ability.text || ability);
+              const isUsed = usedSet.has(text) || (typeof ability === 'object' && ability.used === true);
+              return { text: text, used: isUsed };
+            });
+            
+            const abilitiesKey = `${playerParam}Abilities`;
+            localStorage.setItem(abilitiesKey, JSON.stringify(myAbilities));
+            
+            if (abilitiesWrap) {
+              abilitiesWrap.innerHTML = '';
+              renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+              console.log(`✅ تم عرض ${myAbilities.length} قدرة من Firebase للاعب ${playerParam}`);
+            }
+          }
+        }).catch(err => console.error('Error loading from Firebase:', err));
+      }
+      
+      // ✅ محاولة 3: من gameSetupProgress
+      const gameSetup = localStorage.getItem('gameSetupProgress');
+      if (gameSetup) {
+        try {
+          const setupData = JSON.parse(gameSetup);
+          const playerKey = playerParam === 'player1' ? 'player1' : 'player2';
+          const playerData = setupData[playerKey];
+          
+          if (playerData && playerData.abilities) {
+            console.log(`🔄 تحميل ${playerData.abilities.length} قدرة من gameSetupProgress للاعب ${playerParam}`);
+            myAbilities = normalizeAbilityList(playerData.abilities);
+            const abilitiesKey = `${playerParam}Abilities`;
+            localStorage.setItem(abilitiesKey, JSON.stringify(myAbilities));
+            
+            if (abilitiesWrap) {
+              abilitiesWrap.innerHTML = '';
+              renderBadges(abilitiesWrap, myAbilities, { clickable: true, onClick: requestUseAbility });
+              console.log(`✅ تم عرض ${myAbilities.length} قدرة من gameSetupProgress للاعب ${playerParam}`);
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing gameSetupProgress:', e);
+        }
       }
     }
+  }
+  
+  // ✅ عرض القدرات فوراً إذا كانت متوفرة (بعد تأخير قصير) - لكلا اللاعبين
+  setTimeout(() => {
+    ensureAbilitiesVisible();
   }, 500);
+  
+  // ✅ فحص دوري للتأكد من ظهور القدرات دائماً (كل 2 ثانية)
+  setInterval(() => {
+    ensureAbilitiesVisible();
+  }, 2000);
+  
+  // ✅ مراقبة التغييرات في abilitiesWrap باستخدام MutationObserver
+  if (abilitiesWrap && typeof MutationObserver !== 'undefined') {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList' && mutation.removedNodes.length > 0) {
+          // ✅ إذا تم حذف عناصر، تحقق من إعادة عرضها
+          setTimeout(() => {
+            if (myAbilities && myAbilities.length > 0 && abilitiesWrap.children.length === 0) {
+              console.log(`⚠️ تم اكتشاف حذف القدرات - إعادة عرضها للاعب ${playerParam}`);
+              ensureAbilitiesVisible();
+            }
+          }, 100);
+        }
+      });
+    });
+    
+    observer.observe(abilitiesWrap, {
+      childList: true,
+      subtree: true
+    });
+    
+    console.log(`✅ تم تفعيل MutationObserver لمراقبة القدرات للاعب ${playerParam}`);
+  }
   
   // ✅ حماية: منع التهيئة المكررة
   if (isInitialized) {
