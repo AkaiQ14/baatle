@@ -246,6 +246,9 @@ class CardManager {
          'images/Kaiser.webp',
          'images/MitsuriKanroji.webp',
          'images/Senku.webp',
+         'images/Ghostblade.webp',
+         'images/Byakuya.png',
+
 
       ].filter((card, index, self) => 
         self.indexOf(card) === index
@@ -282,7 +285,6 @@ class CardManager {
         'images/Bisky.png',
         'images/Brook.png',
         'images/Buu.png',
-        'images/Byakuya.png',
         'images/Caesar.png',
         'images/CartTitan.png',
         'images/Cavendish.png',
