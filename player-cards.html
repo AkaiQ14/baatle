@@ -429,6 +429,12 @@
     <p id="abilityStatus" class="mt-2 text-sm opacity-80 text-center md:text-right">اضغط على القدرة لطلب استخدامها. سيتم إشعار المستضيف.</p>
   </section>
 
+  <!-- Your abilities (view-only) - يختفي عند بدء المعركة -->
+  <section id="playerAbilitiesViewPanel" class="w-full max-w-[1235px] mx-auto mt-4 p-3 rounded bg-transparent border border-blue-400 relative z-10 hidden">
+    <p class="font-bold mb-2 text-center md:text-right">قدراتك (عرض فقط):</p>
+    <div id="playerAbilitiesView" class="flex flex-wrap gap-2 justify-center md:justify-start"></div>
+  </section>
+
   <!-- Opponent abilities (view-only) -->
   <section id="opponentAbilitiesPanel" class="w-full max-w-[1235px] mx-auto mt-4 p-3 rounded bg-transparent border border-yellow-400 relative z-10 hidden">
     <p class="font-bold mb-2 text-center md:text-right">قدرات الخصم (عرض فقط):</p>
