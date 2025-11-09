@@ -207,6 +207,10 @@ const continueBtn = document.getElementById("continueBtn");
 const abilitiesWrap = document.getElementById("playerAbilities");
 const abilityStatus = document.getElementById("abilityStatus");
 
+// Player abilities (view-only) - يختفي عند بدء المعركة
+const playerAbilitiesViewPanel = document.getElementById("playerAbilitiesViewPanel");
+const playerAbilitiesViewWrap = document.getElementById("playerAbilitiesView");
+
 // Opponent abilities (view-only)
 const oppPanel = document.getElementById("opponentAbilitiesPanel");
 const oppWrap = document.getElementById("opponentAbilities");
@@ -272,7 +276,7 @@ function normalizeAbilityList(arr) {
   }).filter(Boolean).filter(a => a.text);
 }
 
-function renderBadges(container, abilities, { clickable = false, onClick } = {}) {
+function renderBadges(container, abilities, { clickable = false, onClick, badgeColor = 'gray' } = {}) {
   if (!container) {
     console.error('Container not found for renderBadges');
     return;
@@ -287,19 +291,39 @@ function renderBadges(container, abilities, { clickable = false, onClick } = {})
   
   container.innerHTML = "";
   const list = Array.isArray(abilities) ? abilities : [];
-  console.log('Rendering badges:', { list, clickable });
+  console.log('Rendering badges:', { list, clickable, badgeColor });
   
   list.forEach(ab => {
     const isUsed = !!ab.used;
     const el = document.createElement(clickable ? "button" : "span");
     el.textContent = ab.text;
-    el.className =
-      "px-3 py-1 rounded-lg font-bold border " +
-      (clickable
-        ? (isUsed
-            ? "bg-gray-500/60 text-black/60 border-gray-600 cursor-not-allowed"
-            : "bg-yellow-400 hover:bg-yellow-300 text-black border-yellow-500")
-        : "bg-gray-400/70 text-black border-gray-500");
+    
+    // ✅ تحديد الألوان بناءً على badgeColor
+    let className = "px-3 py-1 rounded-lg font-bold border ";
+    
+    if (clickable) {
+      // أزرار قابلة للنقر (مربع طلب القدرات)
+      if (isUsed) {
+        className += "bg-gray-500/60 text-black/60 border-gray-600 cursor-not-allowed";
+      } else {
+        className += "bg-yellow-400 hover:bg-yellow-300 text-black border-yellow-500";
+      }
+    } else {
+      // أزرار عرض فقط
+      if (badgeColor === 'blue') {
+        // ✅ أزرق لمربع عرض قدرات اللاعب نفسه
+        if (isUsed) {
+          className += "bg-blue-500/60 text-white/80 border-blue-600";
+        } else {
+          className += "bg-blue-400/80 text-white border-blue-500";
+        }
+      } else {
+        // رمادي افتراضي (مربع عرض قدرات الخصم)
+        className += "bg-gray-400/70 text-black border-gray-500";
+      }
+    }
+    
+    el.className = className;
     
     // ✅ إضافة transition للتغيير السلس
     el.style.transition = 'all 0.2s ease';
@@ -332,6 +356,14 @@ function hideOpponentPanel() {
   if (oppPanel) {
     oppPanel.classList.add("hidden");
     if (oppWrap) oppWrap.innerHTML = "";
+  }
+}
+
+// ✅ إخفاء مربع عرض قدرات اللاعب نفسه عند بدء المعركة
+function hidePlayerAbilitiesViewPanel() {
+  if (playerAbilitiesViewPanel) {
+    playerAbilitiesViewPanel.classList.add("hidden");
+    if (playerAbilitiesViewWrap) playerAbilitiesViewWrap.innerHTML = "";
   }
 }
 
@@ -1302,6 +1334,7 @@ async function loadGameData() {
       console.log("✅ تم العثور على ترتيب محفوظ - سيتم عرضه بدلاً من ترتيب Firebase");
       submittedOrder = savedOrder.slice();
       hideOpponentPanel();
+      hidePlayerAbilitiesViewPanel();
       renderCards(submittedOrder, submittedOrder);
       isSelectionPhase = false;
       return; // نوقف التحميل من Firebase هنا
@@ -1484,12 +1517,14 @@ function updateGameData(gameData) {
         savedOrder && savedOrder.length === picks.length) {
       submittedOrder = savedOrder.slice();
       hideOpponentPanel();
+      hidePlayerAbilitiesViewPanel();
       renderCards(submittedOrder, submittedOrder);
       console.log(`✅ تم الحفاظ على ترتيب اللاعب ${playerParam} عند تحديث البيانات`);
     } else {
       submittedOrder = null;
       renderCards(picks, null);
       loadOpponentAbilities();
+      loadPlayerAbilitiesView();
       console.log(`🔄 تم تحديث البطاقات للاعب ${playerParam} بدون ترتيب محفوظ`);
     }
   }
@@ -1687,6 +1722,7 @@ function loadPlayerCards() {
 
   if (submittedOrder && submittedOrder.length === picks.length) {
     hideOpponentPanel();
+    hidePlayerAbilitiesViewPanel();
     console.log('Rendering submitted order on load:', submittedOrder);
     console.log('Picks on load:', picks);
     console.log('Submitted order length:', submittedOrder.length);
@@ -1737,6 +1773,7 @@ function loadPlayerCards() {
     }
     // Show opponent abilities if not submitted
     loadOpponentAbilities();
+    loadPlayerAbilitiesView();
     // إعادة تعيين الزر عند عدم وجود ترتيب مرسل
     if (continueBtn) {
       continueBtn.disabled = false;
@@ -2602,6 +2639,51 @@ function loadPlayerAbilities() {
   }
 }
 
+// ✅ تحميل قدرات اللاعب نفسه (عرض فقط) - يختفي عند بدء المعركة
+function loadPlayerAbilitiesView() {
+  const abilitiesKey = `${playerParam}Abilities`;
+  const savedAbilities = localStorage.getItem(abilitiesKey);
+  
+  if (savedAbilities) {
+    try {
+      const abilities = JSON.parse(savedAbilities);
+      
+      // Only check for used abilities if we're in the middle of a game
+      const currentRound = parseInt(localStorage.getItem('currentRound') || '0');
+      let usedSet = new Set();
+      
+      // Always load used abilities (both from game and from host control)
+      const usedAbilitiesKey = `${playerParam}UsedAbilities`;
+      const usedAbilities = JSON.parse(localStorage.getItem(usedAbilitiesKey) || '[]');
+      usedSet = new Set(usedAbilities);
+      
+      const playerAbilities = abilities.map(ability => {
+        const text = typeof ability === 'string' ? ability : (ability.text || ability);
+        // Check if it's used in game OR used by host
+        const isUsed = usedSet.has(text) || (typeof ability === 'object' && ability.used === true);
+        return { 
+          text, 
+          used: isUsed
+        };
+      });
+      
+      if (playerAbilitiesViewWrap) {
+        playerAbilitiesViewWrap.innerHTML = ''; // Clear first
+        renderBadges(playerAbilitiesViewWrap, playerAbilities, { clickable: false, badgeColor: 'blue' });
+      }
+      
+      // Show player abilities view panel if not submitted
+      if (playerAbilitiesViewPanel && !submittedOrder) {
+        playerAbilitiesViewPanel.classList.remove("hidden");
+      }
+      
+      console.log('Loaded player abilities view:', playerAbilities);
+    } catch (e) {
+      console.error('Error loading player abilities view:', e);
+    }
+  }
+}
+
 // Load opponent abilities
 function loadOpponentAbilities() {
   const opponentParam = playerParam === 'player1' ? 'player2' : 'player1';
@@ -2679,6 +2761,7 @@ console.log('🔄 Initial abilities load...');
 // تحميل فوري
 loadPlayerAbilities();
 loadOpponentAbilities();
+loadPlayerAbilitiesView();
 
 // تحميل إضافي بعد تأخير قصير لضمان جاهزية DOM
 setTimeout(() => {
@@ -3902,6 +3985,7 @@ async function submitPicks() {
     submittedOrder = ordered.slice();
     
     hideOpponentPanel();
+    hidePlayerAbilitiesViewPanel();
     
     // Re-render cards immediately with submitted order (like order.js)
     // Ensure the order is displayed correctly
@@ -4863,6 +4947,7 @@ async function loadTournamentCards() {
     picks = orderToUse.slice(); // Update picks to match the ordered arrangement
     console.log('Loaded existing tournament order:', submittedOrder);
     hideOpponentPanel();
+    hidePlayerAbilitiesViewPanel();
     renderCards(submittedOrder, submittedOrder);
     
     // Update button state
@@ -5049,6 +5134,7 @@ async function submitTournamentPicks() {
     submittedOrder = ordered.slice();
     
     hideOpponentPanel();
+    hidePlayerAbilitiesViewPanel();
     
     // Re-render cards immediately with submitted order
     console.log(`🎯 عرض ترتيب البطولة للاعب ${playerParam}:`, submittedOrder);
