@@ -354,7 +354,7 @@ class CardManager {
         'images/Ikkaku.png',
         'images/Inosuke.png',
         'images/Inumaki.png',
-        'images/Ippo.png',
+        'images/Ippooo.png',
         'images/Iron.png',
         'images/Izuru.png',
         'images/Jack-the-Ripper.png',
