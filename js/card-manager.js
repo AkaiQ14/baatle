@@ -248,6 +248,7 @@ class CardManager {
          'images/Senku.webp',
          'images/Ghostblade.webp',
          'images/Byakuya.png',
+         'images/Goku UI2.webm',
 
 
       ].filter((card, index, self) => 
