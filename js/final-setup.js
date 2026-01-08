@@ -77,12 +77,9 @@ function generatePlayerLinks() {
       player2Name = gameData.player2Name;
     }
     
-    // Get rounds from gameData
-    const rounds = gameData.rounds || 11;
-    
-    // Generate proper URLs with gameId, player name, and rounds
-    const player1Link = `${baseUrl}player-cards.html?gameId=${gameId}&player=1&name=${encodeURIComponent(player1Name)}&rounds=${rounds}`;
-    const player2Link = `${baseUrl}player-cards.html?gameId=${gameId}&player=2&name=${encodeURIComponent(player2Name)}&rounds=${rounds}`;
+    // Generate proper URLs with gameId
+    const player1Link = `${baseUrl}player-cards.html?gameId=${gameId}&player=1`;
+    const player2Link = `${baseUrl}player-cards.html?gameId=${gameId}&player=2`;
     
     console.log('Generated links:', { 
       gameId,
@@ -347,8 +344,6 @@ async function checkPlayerStatus() {
     
     const player1Ready = gameData.player1.isReady;
     const player2Ready = gameData.player2.isReady;
-    // ✅ التحقق من أن اللاعب الأول أنهى اختيار الكروت (وليس الترتيب)
-    const player1CardsSelected = gameData.player1.cardsSelected === true;
     
     // Update player 1 status message
     const player1StatusMessage = document.getElementById('player1StatusMessage');
@@ -359,8 +354,6 @@ async function checkPlayerStatus() {
         player1StatusMessage.classList.remove('show');
       }
     }
-    
-    // ✅ رابط اللاعب الثاني يظهر مباشرة - لا نحتاج التحقق من حالة اللاعب الأول
     
     // Update player 2 status message
     const player2StatusMessage = document.getElementById('player2StatusMessage');
@@ -401,9 +394,6 @@ function checkPlayerStatusLocalStorage() {
     // Get the current game ID
     const gameId = sessionStorage.getItem('currentGameId') || 'default';
 
-    // ✅ التحقق من أن اللاعب الأول أنهى اختيار الكروت (وليس الترتيب)
-    const player1CardsSelected = localStorage.getItem(`${gameId}_player1_cardsSelected`) === 'true';
-
     // Check for actual submitted orders from player-cards.html
     const player1Order = localStorage.getItem(`${gameId}_player1_order`);
     const player2Order = localStorage.getItem(`${gameId}_player2_order`);
@@ -442,8 +432,6 @@ function checkPlayerStatusLocalStorage() {
       }
     }
     
-    // ✅ رابط اللاعب الثاني يظهر مباشرة - لا نحتاج التحقق من حالة اللاعب الأول
-    
     // Update player 2 status message
     const player2StatusMessage = document.getElementById('player2StatusMessage');
     if (player2StatusMessage) {
@@ -467,7 +455,6 @@ function checkPlayerStatusLocalStorage() {
     console.log('Player status check (localStorage):', { 
       player1Completed, 
       player2Completed,
-      player1CardsSelected,
       player1Order: !!player1Order,
       player2Order: !!player2Order
     });
@@ -607,9 +594,6 @@ async function init() {
     // Setup real-time listening
     setupRealTimeListening();
     
-    // ✅ إظهار رابطي اللاعبين معاً مباشرة بعد توزيع القدرات
-    // لا نحتاج إخفاء رابط اللاعب الثاني - يظهران معاً من البداية
-    
     // Add explicit event listener for battle start button
     const battleBtn = document.getElementById('battleBtn');
     if (battleBtn) {
@@ -622,23 +606,6 @@ async function init() {
     console.log('Final-setup page initialized successfully');
   } catch (e) {
     console.error('Error initializing page:', e);
-  }
-}
-
-// إخفاء رابط اللاعب الثاني في البداية
-function hidePlayer2Link() {
-  const player2Container = document.querySelector('.button-container:nth-of-type(2)');
-  if (player2Container) {
-    player2Container.style.display = 'none';
-  }
-}
-
-// إظهار رابط اللاعب الثاني بعد اكتمال ترتيب اللاعب الأول
-function showPlayer2Link() {
-  const player2Container = document.querySelector('.button-container:nth-of-type(2)');
-  if (player2Container) {
-    player2Container.style.display = 'flex';
-    player2Container.style.animation = 'slideIn 0.5s ease-out';
   }
 }
 
@@ -658,8 +625,6 @@ function setupRealTimeListening() {
 function updatePlayerStatus(gameData) {
   const player1Ready = gameData.player1.isReady;
   const player2Ready = gameData.player2.isReady;
-  // ✅ التحقق من أن اللاعب الأول أنهى اختيار الكروت (وليس الترتيب)
-  const player1CardsSelected = gameData.player1.cardsSelected === true;
   
   // Update player 1 status message
   const player1StatusMessage = document.getElementById('player1StatusMessage');
@@ -670,8 +635,6 @@ function updatePlayerStatus(gameData) {
       player1StatusMessage.classList.remove('show');
     }
   }
-  
-  // ✅ رابط اللاعب الثاني يظهر مباشرة - لا نحتاج التحقق من حالة اللاعب الأول
   
   // Update player 2 status message
   const player2StatusMessage = document.getElementById('player2StatusMessage');

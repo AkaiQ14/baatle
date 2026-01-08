@@ -30,187 +30,192 @@ let voiceSystem = {
   
   // Check if card is legendary by name patterns - Updated with all voice files
   isLegendaryByName: function(cardPath) {
-    // All legendary cards that have voice files in voice/ directory
-    const legendaryPatterns = [
-      'aizen', 'AizenVoCrowCard', 'Akai', 'AllForOne', 'Ayanokoji', 'Ranppo', 'Todo', 'ZenoSama',
-      // Removed: 'Asta', 
-      'Beru', 'Cell', 'Sasuke', 'Vermoth', 'Ouki', 'Kakashi', 'Rukia', 'Akame', 'Sukuna', 'Azik',
-      'Goku UI2',
-      'Dio', 'ErenCard', 'foboki', 'Gin', 'Giyuu', 'Gogeta', 'Gohan Beast', 'Gojo', 'Yami', 'vegeta',
-      // Removed: 'Goku UI', 
-      'Hashirama', 'Hawks', 'Hinata', 'Hisoka', 'jiraya', 'Riboku', 'Lelouch', 'Utsuro', 'Kyurak', 'Shinobu',
-      // Changed: 'joker' to 'Joker'
-      'Joker', 'Kaido', 'KaitoKid', 'Kanki', 'Shigaraki', 'Roselle-Gustav', 'Broly', 'Chrollo',
-      'law', 'Lelouch', 'LuffyGear5', 'madara', 'Meruem', 'naruto', 'Neiji', 'Netero', 'obito',
-      'QG14', 'queen', 'Sakamoto', 'shikamaru', 'Shanks', 'Silva Zoldyck', 'smith', 'UmibozoCard',
-      'Garp', 'Gilgamesh', 'Gintoki', 'Ippo', 'Makima', 'Musashi', 'Muzan', 'PrinceHata', 'Smiley',
-      'Sung-Jinwoo', 'Takamura', 'Toji', 'Ulquiorra', 'Walker', 'Yamamoto', 'Yamato', 'Zaraki',
-      'Zenon', 'Escanor', 'Saitama',
-      // Removed: 'Vegetto', 
-      'whitebeard', 'zoro', 'Zenitsu', 'Zeno', 'RockLee', 'AlocardCard', 'alocard', 'alucard', 'AloCard', // إضافة جميع الأسماء المحتملة
-      // New voice files added
-      'All-For-One', 'Goku Black', 'Yoriichi', 'Sonji', 'Bakugo', 'Itachi', 'Meliodas', 'AllMight', 'Roger', 'Yhwach', 'Midoriya',
-      // Additional new voices
-      'Goku-SSJ4', 'Goku-UI', 'Rengoku', 'Beerus', 'Lecht', 'zabuza', 'Ranpo', 'Urahara', 'Hiroto',
-      'Goku-SSJG', 'Goku-SSJB', 'Gogeta', 'Vegito-Blue', 'Giyuu', 'X', 'Shadow', 'Unahanaa'
-    ];
-    
-    const cardName = cardPath.split('/').pop().split('.')[0].toLowerCase();
-    return legendaryPatterns.some(pattern => cardName.includes(pattern.toLowerCase()));
-  },
-  
-  // Check if card is Legendary
-  isLegendaryCard: function(cardPath) {
-    if (!cardPath) return false;
-    return cardPath.includes('Legendary/') || 
-           cardPath.includes('images/') && this.isLegendaryByName(cardPath);
-  },
-  
-  // Enhanced voice file name mapping - Exact match with voice files
-  getVoiceFileName: function(cardPath) {
-    if (!cardPath) return null;
-    
-    // Extract card name from path
-    let cardName = cardPath.split('/').pop().split('.')[0];
-    
-    
-    // Exact mapping to voice file names (case-sensitive)
-    const voiceFileMappings = {
-      // Existing mappings...
-      'aizen': 'aizen',
-      'Azik': 'Azik',
-      'AizenVoCrowCard': 'AizenVoCrowCard',
-      'Akai': 'Akai',
-      'AllForOne': 'AllForOne',
-      'AllMight': 'AllMight',
-      'Ayanokoji': 'Ayanokoji',
-      'Beru': 'Beru',
-      'Bakugo': 'Bakugo',
-      'Broly': 'Broly',
-      'Cell': 'Cell',
-      'Chrollo': 'Chrollo',
-      'Dio': 'Dio',
-      'ErenCard': 'ErenCard',
-      'foboki': 'foboki',
-      'Gin': 'Gin',
-      'Gintoki': 'Gintoki',
-      'Akame': 'Akame',
-      'Giyuu': 'Giyuu',
-      'Gilgamesh': 'Gilgamesh',
-      'Gogeta': 'Gogeta',
-      'Gohan Beast': 'Gohan Beast',
-      'Gojo': 'Gojo',
-      'Goku UI2': 'Goku UI2',
-      'Hashirama': 'Hashirama',
-      'Hawks': 'Hawks',
-      'Hinata': 'Hinata',
-      'Hisoka': 'Hisoka',
-      'Hiroto': 'Hiroto',
-      'Itachi': 'Itachi',
-      'jiraya': 'jiraya',
-      'Yami': 'Yami',
-      'vegeta': 'vegeta',
-      'Escanor': 'Escanor',
-      // Changed: 'joker': 'joker' to 'Joker': 'Joker'
-      'Joker': 'Joker',
-      'Kaido': 'Kaido',
-      'KaitoKid': 'KaitoKid',
-      'Kanki': 'Kanki',
-      'Kyurak': 'Kyurak',
-      'law': 'law',
-      'Lelouch': 'Lelouch',
-      'LuffyGear5': 'LuffyGear5',
-      'madara': 'madara',
-      'Meruem': 'Meruem',
-      'Meliodas': 'Meliodas',
-      'Midoriya': 'Midoriya',
-      'naruto': 'naruto',
-      'Netero': 'Netero',
-      'obito': 'obito',
-      'QG14': 'QG14',
-      'Ouki': 'Ouki',
-      'queen': 'queen',
-      'Ranppo': 'Ranppo',
-      'Riboku': 'Riboku',
-      'Rukia': 'Rukia',
-      'Kakashi': 'Kakashi',
-      'Roselle-Gustav': 'Roselle-Gustav',
-      'PrinceHata': 'PrinceHata',
-      'Sakamoto': 'Sakamoto',
-      'Sonji': 'Sonji',
-      'shikamaru': 'shikamaru',
-      'Shanks': 'Shanks',
-      'Smiley': 'Smiley',
-      'Silva Zoldyck': 'Silva Zoldyck',
-      'Shigaraki': 'Shigaraki',
-      'smith': 'smith',
-      'Todo': 'Todo',
-      'Sasuke': 'Sasuke',
-      'Sung-Jinwoo': 'Sung-Jinwoo',
-      'Takamura': 'Takamura',
-      'Toji': 'Toji',
-      'UmibozoCard': 'UmibozoCard',
-      'Utsuro': 'Utsuro',
-      'Urahara': 'Urahara',
-      'whitebeard': 'whitebeard',
-      'zabuza': 'zabuza',
-      'zoro': 'Zoro',
-      'Zoro': 'Zoro',
-      'Zenitsu': 'Zenitsu',
-      'Zeno': 'Zeno',
-      'ZenoSama': 'ZenoSama',
-      'Zaraki': 'Zaraki',
-      'Neiji': 'Neiji',
-      'RockLee': 'RockLee',
-      'rocklee': 'RockLee',
-      'Roger': 'Roger',
-      'Shinobu': 'Shinobu',
-      'Sukuna': 'Sukuna',
-      'Ippo': 'Ippo',
-      'Makima': 'Makima',
-      'Musashi': 'Musashi',
-      'Muzan': 'Muzan',
-      // AlocardCard support
-      'AlocardCard': 'AlocardCard',
-      'alocardcard': 'AlocardCard',
-      'Alocard': 'AlocardCard',
-      'alocard': 'AlocardCard',
-      'AloCard': 'AlocardCard',
-      'alucard': 'AlocardCard',
-      'Unahanaa': 'Unahanaa',
-      'Ulquiorra': 'Ulquiorra',
-      // New voice files added
-      'All-For-One': 'All-For-One',
-      'Goku Black': 'Goku Black',
-      'Yoriichi': 'Yoriichi',
-      'Yhwach': 'Yhwach',
-      'zabuza': 'zabuza',
-      'X': 'X',
-      'Shadow': 'Shadow',
-      // Additional new voices
-      'Goku-SSJ4': 'Goku-SSJ4',
-      'Garp': 'Garp',
-      'Goku-UI': 'Goku-UI',
-      'Rengoku': 'Rengoku',
-      'Beerus': 'Beerus',
-      'Goku-SSJG': 'Goku-SSJG',
-      'Goku-SSJB': 'Goku-SSJB',
-      'Gogeta': 'Gogeta',
-      'Giyuu': 'Giyuu',
-      'Lecht': 'Lecht',
-      'Vegito-Blue': 'Vegito-Blue',
-      'Vermoth': 'Vermoth',
-      'Walker': 'Walker',
-      'Yamamoto': 'Yamamoto',
-      'Yamato': 'Yamato',
-      'Zenon': 'Zenon',
-      'Saitama': 'Saitama',
-    };
-    
-    // Check for exact match first
-    if (voiceFileMappings[cardName]) {
-      return voiceFileMappings[cardName];
-    }
+ // All legendary cards that have voice files in voice/ directory
+ const legendaryPatterns = [
+  'aizen', 'AizenVoCrowCard', 'Akai', 'AllForOne', 'Ayanokoji', 'Ranppo', 'Todo', 'ZenoSama',
+  // Removed: 'Asta', 
+  'Beru', 'Cell', 'Sasuke', 'Vermoth', 'Ouki', 'Kakashi', 'Rukia', 'Akame', 'Sukuna', 'Azik',
+  'Gehrman-Sparrow', 'Julius', 'Lloyd-Fronter', 'Doflamingo', 'Pain',
+  'Dio', 'ErenCard', 'foboki', 'Gin', 'Giyuu', 'Gogeta', 'Gohan Beast', 'Gojo', 'Yami', 'vegeta',
+  // Removed: 'Goku UI', 
+  'Hashirama', 'Hawks', 'Hinata', 'Hisoka', 'jiraya', 'Riboku', 'Lelouch', 'Utsuro', 'Kyurak', 'Shinobu',
+  // Changed: 'joker' to 'Joker'
+  'Joker', 'Kaido', 'KaitoKid', 'Kanki', 'Shigaraki', 'Roselle-Gustav', 'Broly', 'Chrollo',
+  'law', 'Lelouch', 'LuffyGear5', 'madara', 'Meruem', 'naruto', 'Neiji', 'Netero', 'obito',
+  'QG14', 'queen', 'Sakamoto', 'shikamaru', 'Shanks', 'Silva Zoldyck', 'smith', 'UmibozoCard',
+  'Garp', 'Gilgamesh', 'Gintoki', 'Ippo', 'Makima', 'Musashi', 'Muzan', 'PrinceHata', 'Smiley',
+  'Sung-Jinwoo', 'Takamura', 'Toji', 'Ulquiorra', 'Walker', 'Yamamoto', 'Yamato', 'Zaraki',
+  'Zenon', 'Escanor', 'Saitama', 'Aizeen',
+  // Removed: 'Vegetto', 
+  'whitebeard', 'zoro', 'Zenitsu', 'Zeno', 'RockLee', 'AlocardCard', 'alocard', 'alucard', 'AloCard', // إضافة جميع الأسماء المحتملة
+  // New voice files added
+  'All-For-One', 'Goku Black', 'Yoriichi', 'Sonji', 'Bakugo', 'Itachi', 'Meliodas', 'AllMight', 'Roger', 'Yhwach', 'Midoriya',
+  // Additional new voices
+  'Goku-SSJ4', 'Goku-UI', 'Rengoku', 'Beerus', 'Lecht', 'zabuza', 'Ranpo', 'Urahara', 'Hiroto',
+  'Goku-SSJG', 'Goku-SSJB', 'Gogeta', 'Vegito-Blue', 'Giyuu', 'X', 'Shadow', 'Unahanaa'
+];
+
+const cardName = cardPath.split('/').pop().split('.')[0].toLowerCase();
+return legendaryPatterns.some(pattern => cardName.includes(pattern.toLowerCase()));
+},
+
+// Check if card is Legendary
+isLegendaryCard: function(cardPath) {
+if (!cardPath) return false;
+return cardPath.includes('Legendary/') || 
+       cardPath.includes('images/') && this.isLegendaryByName(cardPath);
+},
+
+// Enhanced voice file name mapping - Exact match with voice files
+getVoiceFileName: function(cardPath) {
+if (!cardPath) return null;
+
+// Extract card name from path
+let cardName = cardPath.split('/').pop().split('.')[0];
+
+
+// Exact mapping to voice file names (case-sensitive)
+const voiceFileMappings = {
+  // Existing mappings...
+  'aizen': 'aizen',
+  'Aizeen': 'Aizeen',
+  'Azik': 'Azik',
+  'AizenVoCrowCard': 'AizenVoCrowCard',
+  'Akai': 'Akai',
+  'AllForOne': 'AllForOne',
+  'AllMight': 'AllMight',
+  'Ayanokoji': 'Ayanokoji',
+  'Beru': 'Beru',
+  'Bakugo': 'Bakugo',
+  'Broly': 'Broly',
+  'Cell': 'Cell',
+  'Chrollo': 'Chrollo',
+  'Dio': 'Dio',
+  'Doflamingo': 'Doflamingo',
+  'ErenCard': 'ErenCard',
+  'foboki': 'foboki',
+  'Gin': 'Gin',
+  'Gintoki': 'Gintoki',
+  'Akame': 'Akame',
+  'Giyuu': 'Giyuu',
+  'Gilgamesh': 'Gilgamesh',
+  'Gogeta': 'Gogeta',
+  'Gohan Beast': 'Gohan Beast',
+  'Gojo': 'Gojo',
+  'Hashirama': 'Hashirama',
+  'Hawks': 'Hawks',
+  'Hinata': 'Hinata',
+  'Hisoka': 'Hisoka',
+  'Hiroto': 'Hiroto',
+  'Itachi': 'Itachi',
+  'jiraya': 'jiraya',
+  'Yami': 'Yami',
+  'vegeta': 'vegeta',
+  'Escanor': 'Escanor',
+  // Changed: 'joker': 'joker' to 'Joker': 'Joker'
+  'Joker': 'Joker',
+  'Kaido': 'Kaido',
+  'KaitoKid': 'KaitoKid',
+  'Kanki': 'Kanki',
+  'Kyurak': 'Kyurak',
+  'law': 'law',
+  'Lelouch': 'Lelouch',
+  'LuffyGear5': 'LuffyGear5',
+  'madara': 'madara',
+  'Meruem': 'Meruem',
+  'Meliodas': 'Meliodas',
+  'Midoriya': 'Midoriya',
+  'naruto': 'naruto',
+  'Netero': 'Netero',
+  'obito': 'obito',
+  'QG14': 'QG14',
+  'Ouki': 'Ouki',
+  'queen': 'queen',
+  'Ranppo': 'Ranppo',
+  'Riboku': 'Riboku',
+  'Rukia': 'Rukia',
+  'Kakashi': 'Kakashi',
+  'Roselle-Gustav': 'Roselle-Gustav',
+  'PrinceHata': 'PrinceHata',
+  'Sakamoto': 'Sakamoto',
+  'Sonji': 'Sonji',
+  'shikamaru': 'shikamaru',
+  'Shanks': 'Shanks',
+  'Smiley': 'Smiley',
+  'Silva Zoldyck': 'Silva Zoldyck',
+  'Shigaraki': 'Shigaraki',
+  'smith': 'smith',
+  'Todo': 'Todo',
+  'Sasuke': 'Sasuke',
+  'Sung-Jinwoo': 'Sung-Jinwoo',
+  'Takamura': 'Takamura',
+  'Toji': 'Toji',
+  'UmibozoCard': 'UmibozoCard',
+  'Utsuro': 'Utsuro',
+  'Urahara': 'Urahara',
+  'whitebeard': 'whitebeard',
+  'zabuza': 'zabuza',
+  'zoro': 'Zoro',
+  'Zoro': 'Zoro',
+  'Zenitsu': 'Zenitsu',
+  'Zeno': 'Zeno',
+  'ZenoSama': 'ZenoSama',
+  'Zaraki': 'Zaraki',
+  'Neiji': 'Neiji',
+  'RockLee': 'RockLee',
+  'rocklee': 'RockLee',
+  'Roger': 'Roger',
+  'Shinobu': 'Shinobu',
+  'Sukuna': 'Sukuna',
+  'Ippo': 'Ippo',
+  'Makima': 'Makima',
+  'Musashi': 'Musashi',
+  'Muzan': 'Muzan',
+  // AlocardCard support
+  'AlocardCard': 'AlocardCard',
+  'alocardcard': 'AlocardCard',
+  'Alocard': 'AlocardCard',
+  'alocard': 'AlocardCard',
+  'AloCard': 'AlocardCard',
+  'alucard': 'AlocardCard',
+  'Unahanaa': 'Unahanaa',
+  'Ulquiorra': 'Ulquiorra',
+  // New voice files added
+  'All-For-One': 'All-For-One',
+  'Goku Black': 'Goku Black',
+  'Yoriichi': 'Yoriichi',
+  'Yhwach': 'Yhwach',
+  'zabuza': 'zabuza',
+  'X': 'X',
+  'Shadow': 'Shadow',
+  // Additional new voices
+  'Goku-SSJ4': 'Goku-SSJ4',
+  'Garp': 'Garp',
+  'Goku-UI': 'Goku-UI',
+  'Rengoku': 'Rengoku',
+  'Beerus': 'Beerus',
+  'Goku-SSJG': 'Goku-SSJG',
+  'Goku-SSJB': 'Goku-SSJB',
+  'Gogeta': 'Gogeta',
+  'Giyuu': 'Giyuu',
+  'Gehrman-Sparrow': 'Gehrman-Sparrow',
+  'Julius': 'Julius',
+  'Lloyd-Fronter': 'Lloyd-Fronter',
+  'Lecht': 'Lecht',
+  'Vegito-Blue': 'Vegito-Blue',
+  'Vermoth': 'Vermoth',
+  'Pain': 'Pain',
+  'Walker': 'Walker',
+  'Yamamoto': 'Yamamoto',
+  'Yamato': 'Yamato',
+  'Zenon': 'Zenon',
+  'Saitama': 'Saitama',
+};
+
+// Check for exact match first
+if (voiceFileMappings[cardName]) {
+  return voiceFileMappings[cardName];
+}
     
     // Check for case-insensitive match
     const lowerCardName = cardName.toLowerCase();
@@ -1405,6 +1410,9 @@ function renderVs(){
         const voiceFileName = voiceSystem.getVoiceFileName(rightCardSrc);
         const audioPath = `voice/${voiceFileName}.mp3`;
 
+        // ✅ حفظ مسار الكرت للاعب الأيمن لإعادة التشغيل
+        voiceSystem.saveLastVoiceForPlayer(player1, rightCardSrc);
+
         // ✅ حمّل الصوت مسبقًا إذا لم يكن جاهزًا
         preloadVoice(rightCardSrc);
         const audio = preloadedVoices[audioPath];
@@ -1470,6 +1478,9 @@ function renderVs(){
       if (voiceSystem && voiceSystem.isLegendaryCard(leftCardSrc)) {
         const voiceFileName = voiceSystem.getVoiceFileName(leftCardSrc);
         const audioPath = `voice/${voiceFileName}.mp3`;
+
+        // ✅ حفظ مسار الكرت للاعب الأيسر لإعادة التشغيل
+        voiceSystem.saveLastVoiceForPlayer(player2, leftCardSrc);
 
         // ✅ حمّل الصوت مسبقًا إذا لم يكن جاهزًا
         preloadVoice(leftCardSrc);
@@ -1668,14 +1679,14 @@ function renderAbilitiesPanel(key, container, fromName, toName){
       // إضافة أيقونة لتوضيح إمكانية الإلغاء
       const displayText = isUsed ? `🔄 ${ab.text} (انقر للإلغاء)` : ab.text;
       
-      const btn = abilityButton(displayText, async ()=>{
+      const btn = abilityButton(displayText, async function(){
         console.log(`Ability clicked: ${ab.text}, current state: ${isUsed}`);
         
         // Toggle ability usage for host
         const newUsedState = !isUsed;
         
         // ✅ تحديث بصري فوري للزر قبل أي شيء آخر
-        const clickedButton = event.currentTarget;
+        const clickedButton = this;
         if (newUsedState) {
           // تم التفعيل - تطبيق الأنماط البرتقالية
           clickedButton.style.setProperty('opacity', '0.9', 'important');
@@ -1747,12 +1758,18 @@ function renderAbilitiesPanel(key, container, fromName, toName){
                 abilities = JSON.parse(localStorage.getItem(globalKey) || '[]');
               }
               
+              // ✅ استخدام usedAbilities المحدثة لتحديد الحالة الصحيحة
+              const currentUsedSet = new Set(usedAbilities);
+              
               const updatedAbilities = abilities.map(ability => {
                 const text = typeof ability === 'string' ? ability : (ability.text || ability);
+                // ✅ استخدام usedAbilities كمصدر الحقيقة للحالة
+                const isCurrentlyUsed = currentUsedSet.has(text);
                 if (text === ab.text) {
                   return typeof ability === 'string' ? { text: ability, used: true } : { ...ability, used: true };
                 }
-                return typeof ability === 'string' ? { text: ability, used: ability.used || false } : ability;
+                // ✅ الحفاظ على القدرات الأخرى مع التحقق من usedAbilities
+                return typeof ability === 'string' ? { text: ability, used: isCurrentlyUsed } : { ...ability, used: isCurrentlyUsed };
               });
               
               const abilitiesRef = ref(database, `games/${gameId}/players/${playerParam}/abilities`);
@@ -1796,12 +1813,18 @@ function renderAbilitiesPanel(key, container, fromName, toName){
                 abilities = JSON.parse(localStorage.getItem(globalKey) || '[]');
               }
               
+              // ✅ استخدام usedAbilities المحدثة لتحديد الحالة الصحيحة
+              const currentUsedSet = new Set(usedAbilities);
+              
               const updatedAbilities = abilities.map(ability => {
                 const text = typeof ability === 'string' ? ability : (ability.text || ability);
+                // ✅ استخدام usedAbilities كمصدر الحقيقة للحالة
+                const isCurrentlyUsed = currentUsedSet.has(text);
                 if (text === ab.text) {
                   return typeof ability === 'string' ? { text: ability, used: false } : { ...ability, used: false };
                 }
-                return typeof ability === 'string' ? { text: ability, used: ability.used || false } : ability;
+                // ✅ الحفاظ على القدرات الأخرى مع التحقق من usedAbilities
+                return typeof ability === 'string' ? { text: ability, used: isCurrentlyUsed } : { ...ability, used: isCurrentlyUsed };
               });
               
               const abilitiesRef = ref(database, `games/${gameId}/players/${playerParam}/abilities`);
@@ -1825,15 +1848,20 @@ function renderAbilitiesPanel(key, container, fromName, toName){
             abilities = JSON.parse(localStorage.getItem(abilitiesKey) || '[]');
           }
           
-          // ✅ تحديث القدرات مع الحفاظ على جميع القدرات
+          // ✅ استخدام usedAbilities المحدثة لتحديد الحالة الصحيحة
+          const currentUsedSet = new Set(usedAbilities);
+          
+          // ✅ تحديث القدرات مع الحفاظ على جميع القدرات والتحقق من usedAbilities
           const updatedAbilities = abilities.map(ability => {
             const text = typeof ability === 'string' ? ability : (ability.text || ability);
+            // ✅ استخدام usedAbilities كمصدر الحقيقة للحالة
+            const isCurrentlyUsed = currentUsedSet.has(text);
             if (text === ab.text) {
               // إعادة تفعيل هذه القدرة فقط
               return typeof ability === 'string' ? { text: ability, used: false } : { ...ability, used: false };
             }
-            // الحفاظ على القدرات الأخرى كما هي
-            return typeof ability === 'string' ? { text: ability, used: ability.used || false } : ability;
+            // ✅ الحفاظ على القدرات الأخرى مع التحقق من usedAbilities
+            return typeof ability === 'string' ? { text: ability, used: isCurrentlyUsed } : { ...ability, used: isCurrentlyUsed };
           });
           
           // ✅ حفظ في كلا المفتاحين لضمان المزامنة

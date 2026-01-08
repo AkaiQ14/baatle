@@ -131,14 +131,10 @@ function generateDynamicDistribution() {
   // Total cards per player
   const totalCardsPerPlayer = 20;
   
-  // Base distribution percentages with added randomness
+  // Dynamic card distribution with updated percentages
   const baseDistribution = {
-    common: 0.40,     // 40%
-    epic: 0.35,       // 35%
-    rare: 0.10,       // 10%
-    legendary: 0.10,  // 10%
-    ultimate: 0.03,   // 3%
-    cursed: 0.02      // 2%
+    common: 0.90,     // 90%
+    epic: 0.10        // 10%
   };
   
   // Add small random variations to percentages
@@ -1144,4 +1140,3 @@ window.selectRandomCards = selectRandomCards;
 window.saveProgress = saveProgress;
 window.savePlayerCards = savePlayerCards;
 window.handleTournamentGameEnd = handleTournamentGameEnd;
-

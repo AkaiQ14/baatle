@@ -1,9 +1,6 @@
 // Final Result Page JavaScript
 // Load game data and display final results
 
-// ✅ تهيئة Firebase أولاً
-import { app } from './firebase-init.js';
-
 // Game data variables
 let gameSetupProgress = {};
 let player1 = "لاعب 1";
@@ -135,7 +132,7 @@ function loadGameData() {
 }
 
 // Determine winner
-async function determineWinner() {
+function determineWinner() {
     console.log('Determining winner with scores:', scores);
     console.log(`${player1} score: ${scores[player1]}, ${player2} score: ${scores[player2]}`);
     
@@ -148,278 +145,86 @@ async function determineWinner() {
     // Check if this is a tournament match
     const isTournamentMatch = localStorage.getItem('currentMatchId') !== null;
     
-    // ✅ الحصول على gameId للتحقق من عدم احتساب المباراة مرتين
-    const gameId = localStorage.getItem('currentGameId') || new URLSearchParams(window.location.search).get('gameId');
-    const gameResultKey = `gameResult_${gameId}`;
-    
-    // ✅ التحقق من أن المباراة لم يتم احتسابها من قبل
-    if (gameId && localStorage.getItem(gameResultKey)) {
-        console.log('⚠️ هذه المباراة تم احتسابها مسبقاً - لن يتم احتسابها مرة أخرى');
+    if (player1Score > player2Score) {
+        winner = player1;
+        winnerName = player1;
+        console.log(`Winner: ${player1} (${player1Score} > ${player2Score})`);
+        // إضافة نتيجة المباراة إلى لوحة المتصدرين
+        addGameResultToLeaderboard(player1, player2);
+    } else if (player2Score > player1Score) {
+        winner = player2;
+        winnerName = player2;
+        console.log(`Winner: ${player2} (${player2Score} > ${player1Score})`);
+        // إضافة نتيجة المباراة إلى لوحة المتصدرين
+        addGameResultToLeaderboard(player2, player1);
     } else {
-        // ✅ احتساب المباراة مرة واحدة فقط
-        if (player1Score > player2Score) {
-            winner = player1;
-            winnerName = player1;
-            console.log(`Winner: ${player1} (${player1Score} > ${player2Score})`);
-            // إضافة نتيجة المباراة إلى لوحة المتصدرين (مرة واحدة فقط)
-            await addGameResultToLeaderboard(player1, player2, gameId);
-        } else if (player2Score > player1Score) {
-            winner = player2;
-            winnerName = player2;
-            console.log(`Winner: ${player2} (${player2Score} > ${player1Score})`);
-            // إضافة نتيجة المباراة إلى لوحة المتصدرين (مرة واحدة فقط)
-            await addGameResultToLeaderboard(player2, player1, gameId);
+        // Draw/Tie
+        if (isTournamentMatch) {
+            winner = "تعادل";
+            winnerName = "تعادل";
+            console.log("⚠️ تعادل في طور البطولة - يجب إعادة المباراة");
         } else {
-            // Draw/Tie
-            if (isTournamentMatch) {
-                winner = "تعادل";
-                winnerName = "تعادل";
-                console.log("⚠️ تعادل في طور البطولة - يجب إعادة المباراة");
-            } else {
-                winner = "تعادل";
-                winnerName = "تعادل";
-                console.log("تعادل - لن يتم إضافة نتيجة إلى لوحة المتصدرين");
-            }
+            winner = "تعادل";
+            winnerName = "تعادل";
+            console.log("تعادل - لن يتم إضافة نتيجة إلى لوحة المتصدرين");
         }
     }
     
     console.log('Winner determined:', winner);
 }
 
-// ✅ دالة للتحقق من تفعيل advancedMode (من localStorage أو Firebase)
-async function checkAdvancedMode() {
-    try {
-        console.log('🔍 بدء التحقق من تفعيل advancedMode...');
-        
-        // محاولة من localStorage أولاً
-        const gameSetup = localStorage.getItem('gameSetupProgress');
-        console.log('🔍 gameSetupProgress موجود:', !!gameSetup);
-        
-        if (gameSetup) {
-            try {
-                const setup = JSON.parse(gameSetup);
-                console.log('🔍 gameSetupProgress parsed:', setup);
-                console.log('🔍 advancedMode value:', setup.advancedMode, 'type:', typeof setup.advancedMode);
-                
-                // ✅ التحقق من advancedMode بعدة طرق
-                if (setup.advancedMode === true || setup.advancedMode === 'true' || setup.advancedMode === 1) {
-                    console.log('✅ التحدي مفعل من localStorage');
-                    return true;
-                } else {
-                    console.log('⚠️ advancedMode موجود لكنه false:', setup.advancedMode);
-                }
-            } catch (e) {
-                console.error('❌ خطأ في تحليل gameSetupProgress:', e);
-            }
-        } else {
-            console.log('⚠️ gameSetupProgress غير موجود في localStorage');
-        }
-        
-        // محاولة من Firebase إذا كان gameId موجوداً
-        // جلب gameId من مصادر متعددة
-        let gameId = localStorage.getItem('currentGameId');
-        console.log('🔍 currentGameId من localStorage:', gameId);
-        
-        // إذا لم يكن موجوداً في localStorage، حاول من URL
-        if (!gameId) {
-            const params = new URLSearchParams(window.location.search);
-            gameId = params.get('gameId');
-            console.log('🔍 currentGameId من URL:', gameId);
-        }
-        
-        // ✅ محاولة من Firebase إذا كان gameId موجوداً (اختياري)
-        if (gameId) {
-            try {
-                console.log('🔍 محاولة جلب advancedMode من Firebase...');
-                
-                // ✅ التأكد من تهيئة Firebase أولاً
-                if (!app && !window.firebaseApp) {
-                    console.warn('⚠️ Firebase غير مهيأ - سيتم الاعتماد على localStorage فقط');
-                    // إذا لم يكن Firebase مهيأ، نعتمد على localStorage فقط
-                    if (gameSetup) {
-                        const setup = JSON.parse(gameSetup);
-                        if (setup.advancedMode === true || setup.advancedMode === 'true' || setup.advancedMode === 1) {
-                            console.log('✅ التحدي مفعل من localStorage (fallback)');
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-                
-                console.log('✅ Firebase مهيأ بنجاح');
-                
-                // استيراد GameService
-                const { GameService } = await import('./gameService.js');
-                
-                // ✅ محاولة جلب البيانات مع معالجة الأخطاء
-                try {
-                    const gameData = await GameService.getGame(gameId);
-                    console.log('🔍 gameData من Firebase:', gameData);
-                    console.log('🔍 advancedMode من Firebase:', gameData?.advancedMode);
-                    
-                    if (gameData && (gameData.advancedMode === true || gameData.advancedMode === 'true' || gameData.advancedMode === 1)) {
-                        console.log('✅ التحدي مفعل من Firebase');
-                        // حفظ في localStorage للمستقبل
-                        const currentSetup = gameSetup ? JSON.parse(gameSetup) : {};
-                        currentSetup.advancedMode = true;
-                        localStorage.setItem('gameSetupProgress', JSON.stringify(currentSetup));
-                        console.log('✅ تم حفظ advancedMode في localStorage');
-                        return true;
-                    } else {
-                        console.log('⚠️ advancedMode من Firebase:', gameData?.advancedMode, '(غير مفعل)');
-                    }
-                } catch (firebaseError) {
-                    console.warn('⚠️ خطأ في جلب البيانات من Firebase، سيتم الاعتماد على localStorage:', firebaseError.message);
-                    // لا نرمي الخطأ، نعتمد على localStorage فقط
-                }
-            } catch (e) {
-                console.warn('⚠️ خطأ في استيراد GameService، سيتم الاعتماد على localStorage:', e.message);
-                // لا نرمي الخطأ، نعتمد على localStorage فقط
-            }
-        } else {
-            console.log('⚠️ gameId غير موجود - الاعتماد على localStorage فقط');
-        }
-        
-        // ✅ إذا لم نجد advancedMode في Firebase، نعتمد على localStorage
-        if (gameSetup) {
-            const setup = JSON.parse(gameSetup);
-            if (setup.advancedMode === true || setup.advancedMode === 'true' || setup.advancedMode === 1) {
-                console.log('✅ التحدي مفعل من localStorage');
-                return true;
-            }
-        }
-        
-        console.log('⚠️ التحدي غير مفعل - لن يتم احتساب المباراة في لوحة المتصدرين');
-        return false;
-    } catch (error) {
-        console.error('❌ خطأ في التحقق من advancedMode:', error);
-        console.error('❌ تفاصيل الخطأ:', error.message, error.stack);
-        return false;
-    }
-}
-
 // Add game result to leaderboard
-let isProcessingGameResult = false; // ✅ منع معالجة متعددة في نفس الوقت
-
-async function addGameResultToLeaderboard(winnerName, loserName, gameId = null) {
+function addGameResultToLeaderboard(winnerName, loserName) {
     try {
-        console.log('🎯 بدء إضافة نتيجة المباراة إلى لوحة المتصدرين...');
-        console.log('🎯 الفائز:', winnerName, 'الخاسر:', loserName, 'gameId:', gameId);
-        
-        // ✅ منع معالجة متعددة في نفس الوقت
-        if (isProcessingGameResult) {
-            console.log('⚠️ يتم معالجة نتيجة مباراة حالياً - لن يتم معالجة هذه المباراة');
-            return;
-        }
-        isProcessingGameResult = true;
-        
-        // ✅ التحقق من أن المباراة لم يتم احتسابها من قبل
-        if (gameId) {
-            const gameResultKey = `gameResult_${gameId}`;
-            if (localStorage.getItem(gameResultKey)) {
-                console.log('⚠️ هذه المباراة تم احتسابها مسبقاً - لن يتم احتسابها مرة أخرى');
-                isProcessingGameResult = false;
-                return;
-            }
-        } else {
-            // ✅ إذا لم يكن gameId موجوداً، نستخدم مفتاح مكون من أسماء اللاعبين والنتيجة
-            const matchKey = `match_${winnerName}_vs_${loserName}_${Date.now()}`;
-            const recentMatches = JSON.parse(localStorage.getItem('recentMatches') || '[]');
-            const matchExists = recentMatches.some(m => 
-                (m.winner === winnerName && m.loser === loserName) ||
-                (m.winner === loserName && m.loser === winnerName)
-            );
-            
-            if (matchExists) {
-                console.log('⚠️ هذه المباراة تم احتسابها مسبقاً - لن يتم احتسابها مرة أخرى');
-                isProcessingGameResult = false;
-                return;
-            }
-        }
-        
         // التحقق من تفعيل التحدي - يجب أن يكون مفعل لإضافة النتائج
-        const isAdvancedMode = await checkAdvancedMode();
-        console.log('🎯 نتيجة التحقق من advancedMode:', isAdvancedMode);
-        
-        if (!isAdvancedMode) {
-            console.log('⚠️ التحدي غير مفعل - لن يتم احتساب المباراة في لوحة المتصدرين');
-            // إظهار رسالة للمستخدم
-            showToast('⚠️ التحدي غير مفعل - لن يتم احتساب المباراة في لوحة المتصدرين', 'warning');
-            // ✅ إعادة تعيين isProcessingGameResult في حالة return المبكر
-            isProcessingGameResult = false;
+        const gameSetup = localStorage.getItem('gameSetupProgress');
+        if (!gameSetup) {
+            console.log('لا توجد بيانات إعدادات - لن يتم احتساب المباراة في لوحة المتصدرين');
             return;
         }
         
-        console.log('✅ التحدي مفعل - سيتم إضافة النتيجة إلى لوحة المتصدرين');
+        const setup = JSON.parse(gameSetup);
+        if (!setup.advancedMode) {
+            console.log('التحدي غير مفعل - لن يتم احتساب المباراة في لوحة المتصدرين');
+            return;
+        }
         
         const leaderboardData = localStorage.getItem('leaderboard');
         let players = leaderboardData ? JSON.parse(leaderboardData) : [];
         
-        console.log('📊 لوحة المتصدرين الحالية:', players.length, 'لاعب');
-        
-        // ✅ إضافة أو تحديث الفائز (مرة واحدة فقط)
+        // إضافة أو تحديث الفائز
         let winner = players.find(p => p.name === winnerName);
         if (!winner) {
             winner = { name: winnerName, wins: 0, losses: 0, games: 0, points: 0, winRate: 0 };
             players.push(winner);
-            console.log(`✅ تم إضافة لاعب جديد للوحة المتصدرين: ${winnerName}`);
+            console.log(`تم إضافة لاعب جديد للوحة المتصدرين: ${winnerName}`);
         }
         winner.wins++;
-        // ✅ لا نضيف games++ هنا - سنحسب المباراة مرة واحدة فقط
+        winner.games++;
+        winner.winRate = Math.round((winner.wins / winner.games) * 100);
         
-        // ✅ إضافة أو تحديث الخاسر (مرة واحدة فقط)
+        // إضافة أو تحديث الخاسر
         let loser = players.find(p => p.name === loserName);
         if (!loser) {
             loser = { name: loserName, wins: 0, losses: 0, games: 0, points: 0, winRate: 0 };
             players.push(loser);
-            console.log(`✅ تم إضافة لاعب جديد للوحة المتصدرين: ${loserName}`);
+            console.log(`تم إضافة لاعب جديد للوحة المتصدرين: ${loserName}`);
         }
         loser.losses++;
-        // ✅ لا نضيف games++ هنا - سنحسب المباراة مرة واحدة فقط
-        
-        // ✅ حساب المباراة مرة واحدة فقط (للمباراة بأكملها)
-        // نحسب المباراة لكل لاعب مرة واحدة فقط
-        winner.games++;
         loser.games++;
-        
-        // ✅ تحديث winRate بعد حساب games
-        winner.winRate = Math.round((winner.wins / winner.games) * 100);
         loser.winRate = Math.round((loser.wins / loser.games) * 100);
         
-        console.log(`✅ تحديث الفائز ${winnerName}: ${winner.wins} فوز، ${winner.losses} خسارة، ${winner.games} مباراة`);
-        console.log(`✅ تحديث الخاسر ${loserName}: ${loser.wins} فوز، ${loser.losses} خسارة، ${loser.games} مباراة`);
-        console.log(`✅ تم احتساب المباراة مرة واحدة فقط: ${winnerName} vs ${loserName}`);
-        
-        // ✅ حفظ لوحة المتصدرين
         saveLeaderboardData(players);
         
-        // ✅ حفظ علامة في localStorage لتجنب احتساب المباراة مرة أخرى
-        if (gameId) {
-            const gameResultKey = `gameResult_${gameId}`;
-            localStorage.setItem(gameResultKey, JSON.stringify({
-                winner: winnerName,
-                loser: loserName,
-                timestamp: new Date().toISOString()
-            }));
-            console.log(`✅ تم حفظ علامة المباراة في localStorage: ${gameResultKey}`);
-        }
-        
-        console.log('✅ تم حفظ لوحة المتصدرين بنجاح');
-        
         // إظهار رسالة تأكيد
-        showToast(`✅ تم احتساب نتيجة المباراة: ${winnerName} فاز على ${loserName}`, 'success');
+        showToast(`تم احتساب نتيجة المباراة: ${winnerName} فاز على ${loserName}`, 'success');
         
-        console.log(`✅ تم إضافة نتيجة المباراة بنجاح: ${winnerName} فاز على ${loserName}`);
-        console.log(`📊 إحصائيات ${winnerName}: ${winner.wins} فوز، ${winner.losses} خسارة، ${winner.games} مباراة، ${winner.winRate}% معدل فوز`);
-        console.log(`📊 إحصائيات ${loserName}: ${loser.wins} فوز، ${loser.losses} خسارة، ${loser.games} مباراة، ${loser.winRate}% معدل فوز`);
-        
-        // ✅ إعادة تعيين isProcessingGameResult
-        isProcessingGameResult = false;
+        console.log(`تم إضافة نتيجة المباراة: ${winnerName} فاز على ${loserName}`);
+        console.log(`إحصائيات ${winnerName}: ${winner.wins} فوز، ${winner.losses} خسارة، ${winner.games} مباراة`);
+        console.log(`إحصائيات ${loserName}: ${loser.wins} فوز، ${loser.losses} خسارة، ${loser.games} مباراة`);
     } catch (error) {
-        console.error('❌ خطأ في إضافة نتيجة المباراة إلى لوحة المتصدرين:', error);
-        showToast("❌ حدث خطأ أثناء احتساب نتيجة المباراة: " + error.message, 'error');
-        // ✅ إعادة تعيين isProcessingGameResult في حالة الخطأ
-        isProcessingGameResult = false;
+        console.error('Error adding game result to leaderboard:', error);
+        showToast("حدث خطأ أثناء احتساب نتيجة المباراة", 'error');
     }
 }
 
@@ -492,7 +297,7 @@ function createCelebration() {
 }
 
 // Add point to winner
-async function addPointToWinner() {
+function addPointToWinner() {
     try {
         if (winner && winner !== "تعادل") {
             scores[winner] += 1;
@@ -501,7 +306,7 @@ async function addPointToWinner() {
             localStorage.setItem('scores', JSON.stringify(scores));
             
             // إضافة النقاط إلى لوحة المتصدرين (فقط إذا كان التحدي مفعل)
-            await addPointToLeaderboard(winner);
+            addPointToLeaderboard(winner);
             
             // Update display
             displayResults();
@@ -521,11 +326,17 @@ async function addPointToWinner() {
 }
 
 // Add point to leaderboard
-async function addPointToLeaderboard(playerName) {
+function addPointToLeaderboard(playerName) {
     try {
         // التحقق من تفعيل التحدي - يجب أن يكون مفعل لإضافة النقاط
-        const isAdvancedMode = await checkAdvancedMode();
-        if (!isAdvancedMode) {
+        const gameSetup = localStorage.getItem('gameSetupProgress');
+        if (!gameSetup) {
+            console.log('لا توجد بيانات إعدادات - لن يتم إضافة النقاط للوحة المتصدرين');
+            return;
+        }
+        
+        const setup = JSON.parse(gameSetup);
+        if (!setup.advancedMode) {
             console.log('التحدي غير مفعل - لن يتم إضافة النقاط للوحة المتصدرين');
             return;
         }
@@ -663,58 +474,6 @@ function startNewGame() {
         localStorage.removeItem('gameCardsGenerated');
         localStorage.removeItem('gameCardsData');
         
-        // ✅ Clear player card slots and selected cards (new selection system)
-        // مسح جميع بيانات الكروت المختارة و cardSlots للاعبين
-        Object.keys(localStorage).forEach(key => {
-            // مسح الكروت المختارة
-            if (key.startsWith('player1SelectedCards_') || key.startsWith('player2SelectedCards_')) {
-                localStorage.removeItem(key);
-            }
-            // مسح cardSlots
-            if (key.startsWith('player1CardSlots') || key.startsWith('player2CardSlots')) {
-                localStorage.removeItem(key);
-            }
-            // مسح isSelectionPhase
-            if (key.startsWith('player1IsSelectionPhase_') || key.startsWith('player2IsSelectionPhase_')) {
-                localStorage.removeItem(key);
-            }
-            // مسح SelectedCards_GameId
-            if (key === 'player1SelectedCards_GameId' || key === 'player2SelectedCards_GameId') {
-                localStorage.removeItem(key);
-            }
-        });
-        
-        // ✅ Clear game ID and picks data
-        localStorage.removeItem('currentGameId');
-        localStorage.removeItem('picks');
-        localStorage.removeItem('cardOrder');
-        localStorage.removeItem('player1Picks');
-        localStorage.removeItem('player2Picks');
-        localStorage.removeItem('player1Order');
-        localStorage.removeItem('player2Order');
-        
-        // ✅ Clear game result markers (to prevent duplicate counting)
-        Object.keys(localStorage).forEach(key => {
-            if (key.startsWith('gameResult_')) {
-                localStorage.removeItem(key);
-                console.log(`✅ تم حذف علامة المباراة: ${key}`);
-            }
-        });
-        
-        // ✅ Clear any remaining game-related data (more specific)
-        Object.keys(localStorage).forEach(key => {
-            // مسح أي بيانات متعلقة بـ gameId (باستثناء currentMatchId الذي يتم مسحه لاحقاً)
-            if ((key.includes('gameId') || key.includes('GameId')) && key !== 'currentMatchId') {
-                localStorage.removeItem(key);
-            }
-            // مسح بيانات الكروت المختارة والترتيب
-            if (key === 'player1CardOrder' || key === 'player2CardOrder' || 
-                key === 'player1CardSelection' || key === 'player2CardSelection' ||
-                key.startsWith('player1CardSlots_') || key.startsWith('player2CardSlots_')) {
-                localStorage.removeItem(key);
-            }
-        });
-        
         // Clear player used abilities
         localStorage.removeItem('player1UsedAbilities');
         localStorage.removeItem('player2UsedAbilities');
@@ -762,8 +521,7 @@ function startNewGame() {
             window.gameCardsData = null;
         }
         
-        console.log('✅ تم مسح جميع بيانات اللعبة بنجاح (القدرات المحفوظة محفوظة)');
-        console.log('✅ تم مسح: الكروت المختارة، cardSlots، gameId، picks، الترتيب، والبيانات الأخرى');
+        console.log('✅ Game data cleared successfully (saved abilities preserved)');
         
         // Also clear any lingering tournament state to ensure challenge mode
         localStorage.removeItem('currentMatchId');
@@ -785,7 +543,7 @@ function startNewGame() {
 
 
 // Initialize page
-async function initializePage() {
+function initializePage() {
     try {
         console.log('Initializing final result page...');
         
@@ -802,8 +560,8 @@ async function initializePage() {
             scores[player2] = scores[player2] || 0;
         }
         
-        // Determine winner (async - سيضيف النتيجة إلى لوحة المتصدرين)
-        await determineWinner();
+        // Determine winner
+        determineWinner();
         
         // Display results
         displayResults();
@@ -910,24 +668,12 @@ window.addPointToWinner = addPointToWinner;
 window.startNewGame = startNewGame;
 window.handleTournamentResult = handleTournamentResult;
 
-// ✅ منع استدعاء initializePage مرتين
-let pageInitialized = false;
-
-async function safeInitializePage() {
-    if (pageInitialized) {
-        console.log('⚠️ الصفحة تم تهيئتها مسبقاً - لن يتم تهيئتها مرة أخرى');
-        return;
-    }
-    pageInitialized = true;
-    await initializePage();
-}
-
 // Initialize when page loads
-document.addEventListener('DOMContentLoaded', safeInitializePage);
+document.addEventListener('DOMContentLoaded', initializePage);
 
 // Also initialize immediately in case DOMContentLoaded already fired
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', safeInitializePage);
+    document.addEventListener('DOMContentLoaded', initializePage);
 } else {
-    safeInitializePage();
+    initializePage();
 }

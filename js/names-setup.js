@@ -1,6 +1,7 @@
 // Import Firebase GameService
 import { GameService } from './gameService.js';
 
+
 // Game state
 let gameState = {
   player1: { name: '', abilities: [], selectedCards: [] },
@@ -13,8 +14,6 @@ let gameState = {
 
 // Load existing data if available
 document.addEventListener('DOMContentLoaded', function() {
-  console.log('📄 names-setup.js loaded');
-  
   // Ensure tournament state is cleared when entering challenge mode
   try {
     localStorage.removeItem('currentMatchId');
@@ -33,22 +32,6 @@ document.addEventListener('DOMContentLoaded', function() {
   loadExistingData();
   setupEventListeners();
   validateForm();
-  
-  // التحقق من Firebase و GameService
-  console.log('🔍 Checking Firebase:', {
-    auth: typeof window.auth !== 'undefined',
-    db: typeof window.db !== 'undefined',
-    firebaseApp: typeof window.firebaseApp !== 'undefined',
-    GameService: typeof GameService !== 'undefined'
-  });
-  
-  // التحقق من تسجيل الدخول
-  if (window.auth) {
-    const user = window.auth.currentUser;
-    console.log('👤 Current user:', user ? user.uid : 'not logged in');
-  } else {
-    console.warn('⚠️ Firebase auth not loaded yet');
-  }
 });
 
 // Function to clear all previous game data
@@ -132,8 +115,6 @@ function loadExistingData() {
 }
 
 function setupEventListeners() {
-  console.log('🔧 Setting up event listeners...');
-  
   const player1Input = document.getElementById('player1Name');
   const player2Input = document.getElementById('player2Name');
   const roundsSelect = document.getElementById('roundsCount');
@@ -142,13 +123,6 @@ function setupEventListeners() {
   const nextBtn = document.getElementById('nextBtn');
   const leaderboardBtn = document.getElementById('leaderboardBtn');
   const controlPanelBtn = document.getElementById('controlPanelBtn');
-  
-  if (!nextBtn) {
-    console.error('❌ nextBtn not found!');
-    return;
-  }
-  
-  console.log('✅ All elements found');
   
   player1Input.addEventListener('input', validateForm);
   player2Input.addEventListener('input', validateForm);
@@ -202,22 +176,11 @@ function setupEventListeners() {
       checkbox.classList.remove('checked');
       advancedModeWrapper.classList.remove('checked');
     }
-    
-    // ✅ حفظ advancedMode فوراً في localStorage
-    saveProgress();
-    console.log('✅ تم تحديث advancedMode إلى:', gameState.advancedMode);
   });
   
   // Next button click
   if (nextBtn) {
-    nextBtn.addEventListener('click', function(e) {
-      console.log('🖱️ Next button clicked');
-      e.preventDefault();
-      nextStep();
-    });
-    console.log('✅ Next button event listener added');
-  } else {
-    console.error('❌ Next button not found!');
+    nextBtn.addEventListener('click', nextStep);
   }
   
   // Leaderboard button click
@@ -275,13 +238,9 @@ function saveProgress() {
 }
 
 async function nextStep() {
-  console.log('🚀 nextStep() called');
-  
   const player1Name = document.getElementById('player1Name').value.trim();
   const player2Name = document.getElementById('player2Name').value.trim();
   const rounds = parseInt(document.getElementById('roundsCount').value);
-  
-  console.log('📝 Player names:', { player1Name, player2Name, rounds });
   
   // التحقق من صحة البيانات
   if (player1Name.length < 2 || player2Name.length < 2) {
@@ -300,98 +259,21 @@ async function nextStep() {
     nextBtn.disabled = true;
     nextBtn.textContent = 'جاري إنشاء اللعبة...';
     
-    // ✅ التحقق من تحميل GameService
-    if (typeof GameService === 'undefined' || !GameService) {
-      console.error('❌ GameService not loaded');
-      // محاولة إعادة التحميل
-      try {
-        const gameServiceModule = await import('./gameService.js');
-        if (gameServiceModule && gameServiceModule.GameService) {
-          window.GameService = gameServiceModule.GameService;
-          GameService = gameServiceModule.GameService;
-          console.log('✅ GameService reloaded successfully');
-        } else {
-          throw new Error('GameService غير محمل. يرجى تحديث الصفحة.');
-        }
-      } catch (importError) {
-        console.error('❌ Error reloading GameService:', importError);
-        throw new Error('فشل تحميل GameService: ' + importError.message);
-      }
-    }
-    console.log('✅ GameService loaded');
-    
-    // ✅ التحقق من Firebase
-    if (typeof window.auth === 'undefined' || !window.auth) {
-      throw new Error('Firebase غير مهيأ. يرجى تحديث الصفحة.');
-    }
-    console.log('✅ Firebase auth loaded');
-    
-    // ✅ التحقق من تسجيل الدخول
-    let user = window.auth ? window.auth.currentUser : null;
-    if (!user) {
-      console.warn('⚠️ User not logged in, attempting to sign in anonymously...');
-      try {
-        // محاولة تسجيل الدخول كضيف
-        const { AuthService } = await import('./auth-service.js');
-        await AuthService.signInAnonymously();
-        // انتظار قصير لتحديث حالة المستخدم
-        await new Promise(resolve => setTimeout(resolve, 500));
-        user = window.auth ? window.auth.currentUser : null;
-        
-        if (!user) {
-          throw new Error('فشل تسجيل الدخول التلقائي');
-        }
-        console.log('✅ User logged in successfully:', user.uid);
-      } catch (authError) {
-        console.error('❌ Error signing in:', authError);
-        alert('فشل تسجيل الدخول. يرجى تحديث الصفحة والمحاولة مرة أخرى.');
-        nextBtn.disabled = false;
-        nextBtn.textContent = 'متابعة';
-        return;
-      }
-    } else {
-      console.log('✅ User logged in:', user.uid);
-    }
-    
-    // ✅ التأكد من تحديث advancedMode قبل إنشاء اللعبة
-    const checkbox = document.getElementById('checkbox');
-    gameState.advancedMode = checkbox.classList.contains('checked');
-    console.log('✅ advancedMode قبل إنشاء اللعبة:', gameState.advancedMode);
-    
-    // حفظ البيانات المحلية أولاً لضمان التزامن
-    saveProgress();
-    
-    console.log('🔄 Creating game in Firebase...');
     // إنشاء لعبة في Firebase
     const gameId = await GameService.createGame(player1Name, player2Name, rounds, gameState.advancedMode);
     
-    if (!gameId) {
-      throw new Error('فشل إنشاء اللعبة - لم يتم إرجاع معرف اللعبة');
-    }
-    
-    // ✅ حفظ معرف اللعبة في localStorage و sessionStorage
-    localStorage.setItem('currentGameId', gameId);
+    // حفظ معرف اللعبة
     sessionStorage.setItem('currentGameId', gameId);
     
-    console.log('✅ تم حفظ gameId:', gameId);
-    console.log('✅ advancedMode في Firebase:', gameState.advancedMode);
-    
-    // ✅ التأكد من حفظ advancedMode في localStorage مرة أخرى بعد إنشاء اللعبة
-    const currentSetup = JSON.parse(localStorage.getItem('gameSetupProgress') || '{}');
-    currentSetup.advancedMode = gameState.advancedMode;
-    currentSetup.gameId = gameId; // حفظ gameId أيضاً
-    localStorage.setItem('gameSetupProgress', JSON.stringify(currentSetup));
-    
-    console.log('✅ تم حفظ gameSetupProgress مع advancedMode:', currentSetup.advancedMode);
+    // حفظ البيانات المحلية للتوافق
+    saveProgress();
     
     // الانتقال للصفحة التالية
-    console.log('🔄 Redirecting to abilities-setup.html...');
     window.location.href = 'abilities-setup.html';
     
   } catch (error) {
-    console.error('❌ Error creating game:', error);
-    console.error('Error stack:', error.stack);
-    alert('حدث خطأ في إنشاء اللعبة: ' + (error.message || error));
+    console.error('Error creating game:', error);
+    alert('حدث خطأ في إنشاء اللعبة: ' + error.message);
     
     // إعادة تفعيل الزر
     const nextBtn = document.getElementById('nextBtn');
@@ -413,7 +295,7 @@ function showLeaderboard() {
     left: 0;
     right: 0;
     bottom: 0;
-    background: url('./images/QG14Background.png') center/cover no-repeat, #8B1538;
+    background: url('images/QG14Background.png') center/cover no-repeat, #8B1538;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -435,56 +317,8 @@ function showLeaderboard() {
         }
       }
       
-      @keyframes containerFadeIn {
-        from {
-          opacity: 0;
-          transform: scale(0.95) translateY(20px);
-        }
-        to {
-          opacity: 1;
-          transform: scale(1) translateY(0);
-        }
-      }
-      
-      @keyframes trophyGlow {
-        0%, 100% { 
-          transform: scale(1);
-          filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.5));
-        }
-        50% { 
-          transform: scale(1.1);
-          filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.8));
-        }
-      }
-      
-      .leaderboard-container {
-        animation: containerFadeIn 0.8s ease-out;
-      }
-      
-      .leaderboard-title {
-        animation: fadeInUp 0.6s ease-out 0.2s backwards;
-      }
-      
-      .podium-container {
-        animation: fadeInUp 0.6s ease-out 0.4s backwards;
-      }
-      
-      .table-container {
-        animation: fadeInUp 0.6s ease-out 0.6s backwards;
-      }
-      
-      .footer-container {
-        animation: fadeInUp 0.6s ease-out 0.8s backwards;
-      }
-      
       .leaderboard-row {
         animation: fadeInUp 0.6s ease-out;
-        transition: all 0.3s ease;
-      }
-      
-      .leaderboard-row:hover {
-        transform: translateX(-5px);
-        background: rgba(220, 38, 38, 0.15) !important;
       }
       
       .leaderboard-row:nth-child(1) { animation-delay: 0.1s; }
@@ -492,55 +326,8 @@ function showLeaderboard() {
       .leaderboard-row:nth-child(3) { animation-delay: 0.3s; }
       .leaderboard-row:nth-child(4) { animation-delay: 0.4s; }
       .leaderboard-row:nth-child(5) { animation-delay: 0.5s; }
-      
-      .podium-item {
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      
-      .podium-item:hover {
-        transform: translateY(-5px) scale(1.05);
-      }
-      
-      .podium-circle {
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        animation: trophyGlow 2s ease-in-out infinite;
-      }
-      
-      .close-btn {
-        position: relative;
-        overflow: hidden;
-      }
-      
-      .close-btn::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-        transition: left 0.5s ease;
-      }
-      
-      .close-btn:hover::before {
-        left: 100%;
-      }
-      
-      .close-btn:hover {
-        background: linear-gradient(135deg, #FFA500, #FFD700);
-        border-color: rgba(255, 255, 255, 0.4);
-        transform: translateY(-3px) scale(1.02);
-        box-shadow: 0 8px 20px rgba(255, 215, 0, 0.4),
-                    0 4px 8px rgba(0, 0, 0, 0.3);
-      }
-      
-      .close-btn:active {
-        transform: translateY(-1px) scale(0.98);
-        box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3),
-                    0 2px 4px rgba(0, 0, 0, 0.2);
-      }
     </style>
-    <div class="leaderboard-container" style="
+    <div style="
       background: transparent;
       color: white;
       width: 96vw;
@@ -554,30 +341,27 @@ function showLeaderboard() {
     ">
       
       <!-- Title -->
-      <div class="leaderboard-title" style="
+      <div style="
         background: transparent;
         color: white;
-        padding: 30px 20px;
+        padding: 20px;
         text-align: center;
         position: relative;
       ">
         <h1 style="
           margin: 0; 
-          font-size: 48px; 
-          font-weight: 800; 
+          font-size: 28px; 
+          font-weight: 700; 
           color: white;
-          letter-spacing: 2px;
-          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5),
-                      0 0 20px rgba(255, 255, 255, 0.6),
-                      0 0 30px rgba(255, 255, 255, 0.4);
-          transition: all 0.3s ease;
+          letter-spacing: 1px;
+          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
         ">
-          🏆 المتصدرين 🏆
+          المتصدرين
         </h1>
       </div>
       
       <!-- Top 3 Podium -->
-      <div class="podium-container" style="
+      <div style="
         background: transparent;
         padding: 20px;
         display: flex;
@@ -587,127 +371,124 @@ function showLeaderboard() {
         margin-bottom: 20px;
       ">
         <!-- 2nd Place -->
-        <div class="podium-item" style="
+        <div style="
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 15px;
+          gap: 10px;
         ">
-          <div class="podium-circle" style="
-            width: 100px;
-            height: 100px;
+          <div style="
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            font-size: 32px;
+            font-size: 22px;
             color: white;
             background: linear-gradient(135deg, #C0C0C0, #808080);
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4),
-                        0 0 25px rgba(192, 192, 192, 0.4);
-            border: 4px solid #C0C0C0;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+            border: 3px solid #C0C0C0;
           ">
             2
           </div>
           <div style="
             color: white;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 14px;
             text-align: center;
-            max-width: 150px;
+            max-width: 100px;
           ">
             ${leaderboard.length >= 2 ? leaderboard[1].name : '---'}
           </div>
           <div style="
             color: #FFD700;
             font-weight: bold;
-            font-size: 16px;
+            font-size: 12px;
           ">
             ${leaderboard.length >= 2 ? (leaderboard[1].points || 0) + ' نقطة' : '0 نقطة'}
           </div>
         </div>
         
         <!-- 1st Place -->
-        <div class="podium-item" style="
+        <div style="
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 15px;
-          transform: translateY(-15px);
+          gap: 10px;
+          transform: translateY(-10px);
         ">
-          <div class="podium-circle" style="
-            width: 130px;
-            height: 130px;
+          <div style="
+            width: 90px;
+            height: 90px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            font-size: 42px;
+            font-size: 28px;
             color: white;
             background: linear-gradient(135deg, #FFD700, #FFA500);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5),
-                        0 0 40px rgba(255, 215, 0, 0.6);
-            border: 5px solid #FFD700;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+            border: 4px solid #FFD700;
           ">
             1
           </div>
           <div style="
             color: white;
             font-weight: bold;
-            font-size: 22px;
+            font-size: 16px;
             text-align: center;
-            max-width: 180px;
+            max-width: 120px;
           ">
             ${leaderboard.length >= 1 ? leaderboard[0].name : '---'}
           </div>
           <div style="
             color: #FFD700;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 14px;
           ">
             ${leaderboard.length >= 1 ? (leaderboard[0].points || 0) + ' نقطة' : '0 نقطة'}
           </div>
         </div>
         
         <!-- 3rd Place -->
-        <div class="podium-item" style="
+        <div style="
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 15px;
+          gap: 10px;
         ">
-          <div class="podium-circle" style="
-            width: 100px;
-            height: 100px;
+          <div style="
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            font-size: 32px;
+            font-size: 22px;
             color: white;
             background: linear-gradient(135deg, #CD7F32, #8B4513);
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4),
-                        0 0 25px rgba(205, 127, 50, 0.4);
-            border: 4px solid #CD7F32;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+            border: 3px solid #CD7F32;
           ">
             3
           </div>
           <div style="
             color: white;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 14px;
             text-align: center;
-            max-width: 150px;
+            max-width: 100px;
           ">
             ${leaderboard.length >= 3 ? leaderboard[2].name : '---'}
           </div>
           <div style="
             color: #FFD700;
             font-weight: bold;
-            font-size: 16px;
+            font-size: 12px;
           ">
             ${leaderboard.length >= 3 ? (leaderboard[2].points || 0) + ' نقطة' : '0 نقطة'}
           </div>
@@ -754,7 +535,7 @@ function showLeaderboard() {
       </div>
       
       <!-- Table Container -->
-      <div class="table-container" style="
+      <div style="
         flex: 1; 
         overflow-y: auto; 
         padding: 20px;
@@ -766,14 +547,11 @@ function showLeaderboard() {
         <table style="
           width: 100%;
           border-collapse: collapse;
-          background: rgba(107, 15, 42, 0.75);
+          background: rgba(107, 15, 42, 0.7);
           color: white;
           font-size: 14px;
-          border-radius: 12px;
+          border-radius: 8px;
           overflow: hidden;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3),
-                      0 2px 4px rgba(0, 0, 0, 0.2);
-          border: 2px solid rgba(220, 38, 38, 0.2);
         ">
           <thead>
             <tr style="background: rgba(90, 13, 36, 0.8);">
@@ -790,7 +568,7 @@ function showLeaderboard() {
             ${leaderboard.length === 0 ? 
               '<tr><td colspan="7" style="padding: 40px; text-align: center; color: #ccc; font-size: 18px;">لا توجد نتائج بعد. ابدأ اللعب!</td></tr>' :
               leaderboard.map((player, index) => `
-                <tr class="leaderboard-row" style="
+                <tr style="
                   border-bottom: 1px solid #4A0A1A;
                   background: ${index % 2 === 0 ? 'rgba(107, 15, 42, 0.6)' : 'rgba(90, 13, 36, 0.6)'};
                 ">
@@ -809,31 +587,23 @@ function showLeaderboard() {
       </div>
       
       <!-- Footer -->
-      <div class="footer-container" style="
+      <div style="
         background: transparent;
         padding: 20px;
         text-align: center;
       ">
-        <button id="closeLeaderboardBtn" class="close-btn" style="
-          background: linear-gradient(135deg, #FFD700, #FFA500);
+        <button id="closeLeaderboardBtn" style="
+          background: #FFD700;
           color: #000;
-          border: 2px solid rgba(255, 255, 255, 0.3);
-          border-radius: 12px;
-          padding: 16px 32px;
-          font-size: 18px;
-          font-weight: 700;
+          border: none;
+          border-radius: 8px;
+          padding: 12px 24px;
+          font-size: 16px;
+          font-weight: bold;
           cursor: pointer;
           font-family: 'Cairo', sans-serif;
-          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-          box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3),
-                      0 2px 4px rgba(0, 0, 0, 0.2);
-          position: relative;
-          overflow: hidden;
-          user-select: none;
-          -webkit-user-select: none;
-          -moz-user-select: none;
-          -ms-user-select: none;
-        ">
+          transition: all 0.3s ease;
+        " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
           إغلاق
         </button>
       </div>
@@ -1166,7 +936,7 @@ function showControlPanel() {
     left: 0;
     right: 0;
     bottom: 0;
-    background: url('./images/QG14Background.png') center/cover no-repeat, #8B1538;
+    background: url('images/QG14Background.png') center/cover no-repeat, #8B1538;
     display: flex;
     align-items: center;
     justify-content: center;

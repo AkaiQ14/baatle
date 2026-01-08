@@ -12,101 +12,38 @@ import { getAuth } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { getApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
 
-// ✅ Wait for Firebase to be initialized
+// Wait for Firebase to be initialized
 let auth, db;
-
-// دالة للحصول على Firebase app
-function getAppInstance() {
-  try {
-    // محاولة من firebase-init.js أولاً
-    if (window.firebaseApp) {
-      return window.firebaseApp;
-    }
-    // محاولة من getApp
-    return getApp();
-  } catch (error) {
-    console.warn('Firebase not initialized yet, will use window objects...');
-    return null;
-  }
-}
-
-// تهيئة Firebase
-function initializeFirebase() {
-  try {
-    const app = getAppInstance();
-    if (app) {
-      auth = getAuth(app);
-      db = getFirestore(app);
-      console.log('✅ Firebase initialized in GameService');
-    } else {
-      // Fallback: get from window if available
-      if (window.auth && window.db) {
-        auth = window.auth;
-        db = window.db;
-        console.log('✅ Firebase initialized from window objects');
-      }
-    }
-  } catch (error) {
-    console.warn('Firebase initialization warning:', error);
-    // Fallback: get from window if available
+try {
+  const app = getApp(); // Get the initialized app
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (error) {
+  console.error('Firebase not initialized yet, will retry...');
+  // Fallback: get from window if available
+  setTimeout(() => {
     if (window.auth && window.db) {
       auth = window.auth;
       db = window.db;
     }
-  }
+  }, 100);
 }
-
-// تهيئة فورية
-initializeFirebase();
-
-// ✅ محاولة إضافية بعد تأخير قصير
-setTimeout(() => {
-  if (!auth || !db) {
-    initializeFirebase();
-  }
-}, 100);
 
 export class GameService {
   // إنشاء لعبة جديدة
   static async createGame(player1Name, player2Name, rounds, advancedMode = false) {
-    console.log('🎮 GameService.createGame called with:', { player1Name, player2Name, rounds, advancedMode });
-    
     // Ensure auth and db are initialized
     if (!auth || !db) {
-      console.log('⚠️ auth or db not initialized, trying to initialize...');
-      try {
-        const app = getAppInstance();
-        if (app) {
-          auth = getAuth(app);
-          db = getFirestore(app);
-          console.log('✅ Firebase initialized in createGame');
-        } else {
-          // Fallback: get from window
-          if (window.auth && window.db) {
-            auth = window.auth;
-            db = window.db;
-            console.log('✅ Firebase initialized from window objects');
-          } else {
-            throw new Error('Firebase not initialized');
-          }
-        }
-      } catch (error) {
-        console.error('❌ Error initializing Firebase:', error);
-        throw new Error('فشل تهيئة Firebase: ' + error.message);
-      }
-    }
-    
-    if (!auth || !db) {
-      throw new Error('Firebase غير مهيأ بشكل صحيح');
+      const app = getApp();
+      auth = getAuth(app);
+      db = getFirestore(app);
     }
     
     const user = auth.currentUser;
     if (!user) {
-      console.error('❌ User not logged in');
-      throw new Error('الرجاء تسجيل الدخول أولاً');
+      alert("الرجاء تسجيل الدخول أولاً");
+      return;
     }
-    
-    console.log('✅ User authenticated:', user.uid);
 
     const gameData = {
       player1: {
@@ -165,21 +102,6 @@ export class GameService {
     });
   }
   
-  // حفظ cardSlots (البطاقات الصفراء مع 3 كروت لكل بطاقة)
-  static async savePlayerCardSlots(gameId, player, cardSlots) {
-    // Ensure db is initialized
-    if (!db) {
-      const app = getApp();
-      db = getFirestore(app);
-    }
-    
-    const gameRef = doc(db, 'games', gameId);
-    await updateDoc(gameRef, {
-      [`player${player}.cardSlots`]: cardSlots,
-      updatedAt: new Date()
-    });
-  }
-  
   // حفظ القدرات
   static async savePlayerAbilities(gameId, player, abilities) {
     // Ensure db is initialized
@@ -191,21 +113,6 @@ export class GameService {
     const gameRef = doc(db, 'games', gameId);
     await updateDoc(gameRef, {
       [`player${player}.abilities`]: abilities,
-      updatedAt: new Date()
-    });
-  }
-  
-  // ✅ حفظ علامة أن اللاعب أنهى اختيار الكروت (قبل الترتيب)
-  static async savePlayerCardsSelected(gameId, player, cardsSelected) {
-    // Ensure db is initialized
-    if (!db) {
-      const app = getApp();
-      db = getFirestore(app);
-    }
-    
-    const gameRef = doc(db, 'games', gameId);
-    await updateDoc(gameRef, {
-      [`player${player}.cardsSelected`]: cardsSelected,
       updatedAt: new Date()
     });
   }
@@ -228,19 +135,10 @@ export class GameService {
   
   // جلب بيانات اللعبة
   static async getGame(gameId) {
-    // ✅ Ensure db is initialized
+    // Ensure db is initialized
     if (!db) {
-      initializeFirebase();
-      // انتظار قصير إذا لم يكن مهيأ بعد
-      if (!db) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        initializeFirebase();
-      }
-    }
-    
-    // ✅ التأكد من أن db مهيأ قبل الاستخدام
-    if (!db) {
-      throw new Error('Firebase not initialized. Please refresh the page.');
+      const app = getApp();
+      db = getFirestore(app);
     }
     
     const gameRef = doc(db, 'games', gameId);
